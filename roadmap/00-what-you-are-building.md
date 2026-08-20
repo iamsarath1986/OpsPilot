@@ -1,4 +1,4 @@
-# OpsAssistant — What You Are Building
+# OpsPilot — What You Are Building
 
 *Plain-language project definition. Read this once. Everything in `roadmap/` builds this one product.*
 
@@ -16,9 +16,9 @@ Today, a support engineer:
 
 Steps 2–4 are slow, inconsistent between engineers, and the knowledge lives in people's heads.
 
-## What OpsAssistant does
+## What OpsPilot does
 
-**OpsAssistant is a read-only incident diagnosis service for hosting operations.** It takes an incident plus a log excerpt, and returns a structured, evidence-cited diagnosis that a support engineer can act on — or an honest "I don't have enough evidence, escalate this."
+**OpsPilot is a read-only incident diagnosis service for hosting operations.** It takes an incident plus a log excerpt, and returns a structured, evidence-cited diagnosis that a support engineer can act on — or an honest "I don't have enough evidence, escalate this."
 
 It is an API-first backend product, not a chatbot.
 

@@ -1,6 +1,6 @@
 # Milestone 1 — The Domain Model and Deterministic Log Analysis
 
-**Goal:** OpsAssistant exists as a typed, tested Python package with a CLI that can create an incident, attach a log file, and produce **rule-based** findings — with no AI, no database, no web framework.
+**Goal:** OpsPilot exists as a typed, tested Python package with a CLI that can create an incident, attach a log file, and produce **rule-based** findings — with no AI, no database, no web framework.
 
 **Why start here and not with FastAPI or an LLM:** every later layer (API schemas, DB tables, prompts, evaluation cases) is a *projection of the domain model*. If "what is an Incident, what is a Finding, what is Evidence" is unclear now, you will re-litigate it at every milestone. Starting with the LLM instead produces a demo you cannot test, cannot persist, and cannot explain.
 
@@ -55,9 +55,9 @@ Build in this order. Each step is a commit.
 ### Step 1 — Repository skeleton
 
 ```
-opsassistant/
+opspilot/
 ├── pyproject.toml
-├── src/opsassistant/
+├── src/opspilot/
 │   ├── __init__.py
 │   ├── domain/          # entities, enums, errors — zero I/O, zero imports from other layers
 │   ├── application/     # use cases + ports (protocols)
@@ -86,11 +86,11 @@ The dependency rule: `domain` imports nothing from the others. `application` imp
 ### Step 3 — Error taxonomy
 
 ```python
-class OpsAssistantError(Exception): ...
-class InvalidIncidentState(OpsAssistantError): ...
-class UnsupportedLogFormat(OpsAssistantError): ...
-class ArtifactTooLarge(OpsAssistantError): ...
-class IncidentNotFound(OpsAssistantError): ...
+class OpsPilotError(Exception): ...
+class InvalidIncidentState(OpsPilotError): ...
+class UnsupportedLogFormat(OpsPilotError): ...
+class ArtifactTooLarge(OpsPilotError): ...
+class IncidentNotFound(OpsPilotError): ...
 ```
 
 Each maps to an HTTP status in M3 and to a user-facing message. Never `raise Exception("bad")`.
@@ -130,10 +130,10 @@ Implement `InMemoryIncidentRepository`. Write **contract tests** against the pro
 ### Step 7 — CLI
 
 ```
-opsassistant incident create --title "500 after deploy" --tenant acme
-opsassistant incident attach <id> --file samples/nginx-error.log
-opsassistant incident analyze <id>
-opsassistant incident show <id>
+opspilot incident create --title "500 after deploy" --tenant acme
+opspilot incident attach <id> --file samples/nginx-error.log
+opspilot incident analyze <id>
+opspilot incident show <id>
 ```
 
 The CLI is an *adapter*. It parses arguments and prints; it contains no business logic. Prove it: your use-case tests should never touch the CLI.
