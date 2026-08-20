@@ -1,0 +1,13 @@
+.env
+.idea/
+*.log
+db_data/
+#CLAUDE.md
+#AGENTS.md
+#.codex
+#.claude
+node_modules
+#note.txt
+#requirements.txt
+.venv
+__pycache__/
