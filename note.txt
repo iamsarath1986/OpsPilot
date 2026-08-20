@@ -1,0 +1,36 @@
+From the project root:
+======================
+# python -m pip install -r requirements.txt
+
+If you are using a virtual environment, activate it first:
+
+# python -m venv .venv
+# source .venv/bin/activate
+# python -m pip install -r requirements.txt
+
+Then verify:
+
+# python -m pip check
+
+For this project, you can run the app with:
+
+Local development	     ✅ fastapi dev app/main.py --port 8087
+Tutorials/documentation	 ✅ uvicorn app.main:app --reload --port 8087
+Production	             ✅ uvicorn app.main:app --host 0.0.0.0 --port 8087 (without --reload)
+
+# python3 -m pytest
+
+========= Migration ===========
+# alembic init alembic -> This creates the Alembic folder and config file.
+# alembic upgrade head -> Apply migration
+# alembic current -> Verify
+
+========= Docker ===============
+docker compose exec postgres psql -U arenacore -d arenacore -c "\dt"
+
+=========== sqlalchemy ============
+db.add(user)      -> put object into SQLAlchemy session
+db.flush()        -> send INSERT/UPDATE/DELETE to database, but don't commit
+db.refresh(user)  -> SELECT latest row data back into the Python object
+
+
