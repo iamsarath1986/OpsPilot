@@ -7,7 +7,7 @@ One product, built in twelve milestones. Written to be *done*, not just read.
 | File | What it covers |
 |---|---|
 | [00-what-you-are-building.md](00-what-you-are-building.md) | The project in plain language: the problem, an example request and response, who uses it, how it grows |
-| [02-discovery-with-operations.md](02-discovery-with-operations.md) | Questions for the operations team, shared-hosting pain points, and an email you can send |
+| [02-discovery-with-operations.md](02-discovery-with-operations.md) | Questions for the operations team, shared-hosting pain points, and what ops has told us so far |
 
 ## The milestones
 

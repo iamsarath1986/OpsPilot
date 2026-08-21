@@ -8,7 +8,7 @@ Three answers from ops will change your design:
 
 | Question | If the answer is… | Consequence for the build |
 |---|---|---|
-| May customer log data leave our infrastructure? | No | No public LLM API. You need a self-hosted model, or a contractual/regional arrangement (e.g. Azure OpenAI in a specific region with no-training terms). Redaction stops being a nice-to-have and becomes the product. |
+| May customer log data leave our infrastructure? | **Answered: no** — see [ADR-000](01-the-binding-constraint.md) | No hosted LLM API. Inference is self-hosted. This was decided by the CEO on 2026-08-21 and constrains every later decision. |
 | Do written runbooks exist? | No, it's tribal knowledge | Milestone 8 (RAG) has nothing to retrieve. You must first *create* a small runbook corpus — which is itself valuable to the employer, and a legitimate deliverable. |
 | What does a wrong answer cost? | An engineer runs a destructive fix on a customer account | Abstention threshold goes up, escalation becomes the default, and "confidence" must be calibrated, not decorative. |
 
@@ -126,41 +126,34 @@ Write up, in this order:
 4. The cost of a wrong answer — this sets the abstention and escalation policy in Milestone 9.
 5. The one metric ops said would convince them — this becomes the headline of your final report, and of the project section on your CV.
 
-## The email to send
+## Findings so far — reply from operations, 2026-08-21
 
-Adapt the recipient's name and your team's tone.
+First contact was a short written question about how a "500 Internal Server Error" ticket is handled. The operations manager's reply established the following.
 
----
+**Confirmed**
 
-**Subject:** 25 minutes on support tickets — building an internal diagnosis assistant
+- Intake is by **phone and email**. Tickets are then triaged **by a human** into Accounting, Legal, Tariff, or Technical. Categorisation happens before anyone opens a log.
+- First-level support diagnoses using **"FTP analysis or available logs"**. The manual log-hunting hypothesis is correct, and it is the documented normal path, not a fallback for hard cases.
+- First-level has two possible outcomes: **give the customer a hint about where the error might be**, or fix it directly.
+- Escalation ladder: **first-level support → next support level → Technology / Data Centre / Programmers.**
+- **No internal diagnostic application was mentioned.** The question was asked directly and the answer described only people, FTP, and log files. Silence is not proof — confirm explicitly — but nothing suggests tooling sits between the engineer and the log file.
 
-Hi [Name],
+**What this changes**
 
-I'm building an internal tool that could take some of the repetitive diagnosis work off the support queue, and I'd rather design it around what actually slows you down than guess.
+- **The user is confirmed:** first-level support, mid-ticket, with log text in front of them. Not the customer, not the programmers.
+- **The value hypothesis sharpens.** Not "answer the ticket", but two measurable things: (a) more technical tickets resolved at first level, and (b) when escalation does happen, it carries a complete picture instead of "customer says 500". (b) is the escalation packet in Milestone 9, it is the safer win, and it has value even when the diagnosis is wrong — the human above still gets a head start.
+- **"Give the customer a hint about where the error might be" is the output specification**, phrased by the people who do the job. A located, evidenced pointer — not a fix, not a guess. That sentence belongs in the Milestone 6 prompt and constrains the Milestone 1 domain model.
+- **The headline metric is the first-level resolution rate.** That is the number a manager funds a project against, and the number the final report should lead with.
 
-The idea in one line: an engineer pastes a ticket and a log excerpt, and the tool returns a likely cause with the exact log lines it's based on, plus the relevant runbook steps. It's read-only — it never touches a server, never runs commands, and never changes a customer account. When it isn't confident, it says so and hands the ticket back rather than guessing.
+**Still open, highest value first**
 
-Could I borrow 25 minutes with you or someone on the team? The things I most want to understand:
+1. First-level resolution rate, and what actually triggers escalation — access, knowledge, or authority.
+2. Repeat-cause distribution: is there a top five? (Milestone 1 rules, Milestone 9 eval slices.)
+3. Whether written runbooks exist or knowledge is tribal. This sizes Milestone 8 — retrieve an existing corpus, or author one with the team.
+4. Data-handling rules for customer log content. Blocks the Milestone 12 hosting decision and sets the Milestone 5 redaction targets.
+5. Whether any diagnostic tooling exists that the reply did not mention.
+6. Cost of a confidently wrong suggestion. Sets the abstention policy.
 
-1. Which ticket types come up most often, and which are most repetitive to diagnose?
-2. Where does time actually go on a typical ticket — finding the right log, knowing what the error means, or knowing the fix?
-3. Where does the team's knowledge live today: written runbooks, the ticket history, or people's heads?
-4. What would a wrong or overconfident suggestion cost us? I want to set the "I don't know" threshold conservatively.
-5. Are there rules about customer log data — what can be copied, and whether it may be processed outside our infrastructure?
+**The channel that opened.** Operations offered to fold questions into an onboarding training they are building, and asked for more. This is a better channel than a meeting request: written, invited, and answered by the people who own the workflow. Open questions 1–4 go back through it, framed as training topics rather than requirements gathering.
 
-If it's useful, I'd also like around 20 already-closed tickets (anonymised is fine) to test against, so I can measure whether the tool is actually right rather than just plausible.
-
-Happy to fit around a quiet slot in the shift — and happy to show you what I've built so far first if that's more useful than a discussion in the abstract.
-
-Thanks,
-[Your name]
-
----
-
-### Variants
-
-**Writing to the ops manager rather than the team:** add a line on measurement — "if it works, the thing I'd measure is handle time on the top three ticket types, and how often tier-1 escalates for information rather than access." Managers back things that arrive with a number attached.
-
-**If the project isn't formally approved yet:** remove the request for closed tickets from the first email. Ask once there's interest, and route it through your manager. Requesting customer data — even anonymised — lands better after buy-in than before it.
-
-**If you already have something running:** lead with the demo offer instead of the questions. Five minutes of a working tool produces better requirements than thirty minutes of hypotheticals.
+**Deliberately not yet asked:** real tickets or log samples. That is a data-protection conversation, it goes through the manager, and it belongs after someone has seen a demo — not bundled into a training request, where it would make an easy ask look like a hard one.
