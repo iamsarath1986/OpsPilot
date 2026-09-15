@@ -2,7 +2,7 @@
 
 **Goal:** real authentication and authorization, hard tenant isolation, safe file upload, an audit trail, and a redaction pipeline that strips secrets and personal data out of log content before it is stored — let alone sent to a model.
 
-**Why now:** the `X-Tenant-Id` header from Milestone 3 is a security hole with a comment on it. More importantly, Milestone 6 sends log text to a third party. Building redaction *after* that is how data incidents happen. In a shared-hosting business, customer log lines are among the most sensitive data you handle.
+**Why now:** the `X-Tenant-Id` header from Milestone 3 is a security hole with a comment on it. More importantly, self-hosting does not make raw customer logs safe to copy: Milestones 4–11 place derived content in databases, caches, evaluation datasets, developer machines, and telemetry with wider internal access than the source log. Redaction limits that blast radius and supports GDPR least-privilege handling before any of those copies exist.
 
 **Time:** 4–5 focused weeks. **Prerequisite:** Milestone 4 checklist green.
 
@@ -25,7 +25,7 @@
 | PII and secret redaction | Hosting logs contain IPs, email addresses, customer names in paths, and sometimes tokens in query strings. |
 | Audit logging | Who viewed which customer's incident, and when. Needed for trust, and often for compliance. |
 | Rate limiting basics | Brute-force protection on login, and abuse control on expensive endpoints. |
-| Secrets handling | Environment variables now; Key Vault in Milestone 12. Never in code, never in logs, never in Git history. |
+| Secrets handling | Environment variables now; Azure Key Vault and the approved internal secret store in Milestone 12. Never in code, never in logs, never in Git history. |
 | Threat modelling (STRIDE) | A structured way to find the attacks you didn't think of, before an attacker does. |
 
 ## 2. Learning Depth
@@ -86,7 +86,7 @@ Start with `tenant_id` on every table plus enforcement in the repository layer. 
 
 **After:** every request is authenticated; every data access is tenant-scoped at a chokepoint and role-checked; uploads are bounded and sanitised; log content is redacted before storage; sensitive actions are audited; and there is a written threat model with a known residual-risk list.
 
-**Architecturally:** OpsPilot is now safe enough to hold real customer data — which is the precondition for the ops team giving you real tickets, and for Milestone 6 sending anything to a third-party model.
+**Architecturally:** OpsPilot is now safe enough to hold approved customer data — which is the precondition for the ops team giving you sanitised real tickets, and for Milestone 6 sending redacted content to the self-hosted inference service without widening internal access unnecessarily.
 
 ## 6. Testing and Validation
 
@@ -119,7 +119,7 @@ Start with `tenant_id` on every table plus enforcement in the repository layer. 
 - Secure file handling and a measured PII/secret redaction pipeline
 - Audit logging and threat modelling
 
-**Job-description mapping:** *APIs and backend systems* and *real-world AI products*. Security is rarely listed explicitly in AI job descriptions and is always expected — and in an AI system it is doubled, because you are about to send customer data to a third party. Being the candidate who redacts *before* the model call is a differentiator you can state in one sentence.
+**Job-description mapping:** *APIs and backend systems* and *real-world AI products*. Security is rarely listed explicitly in AI job descriptions and is always expected. The defensible interview point is that self-hosting satisfied the residency boundary, while redaction separately limited internal exposure across persistence, caches, telemetry, and portable evaluation data.
 
 ## 9. Milestone Completion Checklist
 

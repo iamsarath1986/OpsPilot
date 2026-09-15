@@ -57,7 +57,7 @@
 
 ### Step 1 — Local infrastructure
 
-A `docker-compose.yml` with PostgreSQL, a named volume, a health check, and a pinned major version matching what you will run on Azure. One command should give any developer a working database.
+A `docker-compose.yml` with PostgreSQL, a named volume, a health check, and a pinned major version supported by both the company deployment and the synthetic Azure target. One command should give any developer a working database.
 
 ### Step 2 — Schema
 
@@ -71,7 +71,7 @@ A `docker-compose.yml` with PostgreSQL, a named volume, a health check, and a pi
 | `evidence` | The exact log lines a finding relies on | FK to finding and artifact; line number; text |
 | `idempotency_keys` | Deduplicate client retries | Unique on (tenant, key); stored response; expiry |
 
-Design decisions to make consciously and record: surrogate UUID keys versus bigserial; enum type versus a checked varchar; storing artifact content in a column versus a file reference (choose the reference — Milestone 12 moves it to Blob Storage, and a 200 MB `TEXT` column will hurt you before then); and cascade behaviour on delete.
+Design decisions to make consciously and record: surrogate UUID keys versus bigserial; enum type versus a checked varchar; storing artifact content in a column versus a file reference (choose the reference — Milestone 12 maps the artifact port to approved on-prem object storage and to Blob Storage for synthetic Azure data, and a 200 MB `TEXT` column will hurt you before then); and cascade behaviour on delete.
 
 ### Step 3 — Mapping and the unit of work
 

@@ -14,7 +14,7 @@
 |---|---|
 | The event loop, coroutines, tasks | One process must handle many requests that are all *waiting*. Async gives you concurrency without a thread per request. |
 | `await`, `asyncio.gather`, `TaskGroup` | Ten sequential 200 ms calls take two seconds. Concurrent ones take 200 ms. This is the entire reason async exists in your project. |
-| Cancellation and `asyncio.timeout` | A client disconnects or an LLM hangs. Work must stop and clean up rather than run on invisibly, consuming quota. |
+| Cancellation and `asyncio.timeout` | A client disconnects or an LLM hangs. Work must stop and clean up rather than run on invisibly, consuming scarce inference capacity. |
 | Semaphores / bounded concurrency | Unbounded `gather` over 10,000 log files opens 10,000 file handles and dies. Bounds are not optional in production. |
 | GIL, threads, processes, `asyncio.to_thread` | Async does **not** speed up CPU-bound parsing. Knowing which of the three tools fits which workload is a standard interview question and a real design decision here. |
 | Blocking the event loop | One `time.sleep` or one big regex in a coroutine stalls *every* concurrent request. You must be able to recognise and prove this. |
@@ -67,7 +67,7 @@
 
 ### Step 2 — Typed configuration
 
-One `Settings` class: log level, max artifact bytes, max line length, analysis concurrency, and a placeholder for the future LLM key. Loaded from environment with `pydantic-settings`, validated at startup, and never read via `os.environ` scattered through the code.
+One `Settings` class: log level, max artifact bytes, max line length, analysis concurrency, and placeholders for the future internal inference base URL and model identifier. Loaded from environment with `pydantic-settings`, validated at startup, and never read via `os.environ` scattered through the code.
 
 Rules to enforce now, because they get expensive later: secrets have no defaults; `Settings` is constructed once and injected, never imported as a global singleton by business code; and `repr` of settings must never print a secret. Test that last one.
 

@@ -22,6 +22,8 @@ Steps 2–4 are slow, inconsistent between engineers, and the knowledge lives in
 
 It is an API-first backend product, not a chatbot.
 
+Customer data never leaves company infrastructure. Generation, embeddings, reranking, and judging all run on self-hosted models; Azure is a synthetic-only portability target. This binding constraint and its consequences are recorded in [ADR-000](01-the-binding-constraint.md).
+
 ### One request, end to end
 
 A client posts an incident and a log excerpt:
@@ -56,12 +58,27 @@ The service responds with **structured data**, not prose:
   "evidence": [
     {"id": "ev_3", "line": 142, "text": "2026-08-19 14:22:01 [error] 2231#0: *5 open() \"/var/www/arenacore/public/index.php\" failed (13: Permission denied)"}
   ],
-  "escalate": false,
+  "needs_escalation": false,
+  "unsupported": false,
+  "unsupported_reason": null,
   "prompt_version": "diagnose@v4",
-  "model": "…",
+  "model": {
+    "name": "…",
+    "revision": "…",
+    "quantisation": "…"
+  },
+  "decoding_config_version": "diagnosis-schema@v2",
   "latency_ms": 2140,
-  "tokens": {"input": 1832, "output": 214}
+  "queue_ms": 86,
+  "tokens": {"input": 1832, "output": 214},
+  "generation_tokens_per_second": 31.4
 }
+```
+
+A degraded response makes the weaker execution path explicit:
+
+```json
+{"status": "degraded", "degradation_reason": "capacity_saturated", "output_source": "deterministic_rules"}
 ```
 
 Every field in that response exists for a reason you will be able to defend:
@@ -69,17 +86,19 @@ Every field in that response exists for a reason you will be able to defend:
 | Field | Why it exists |
 |---|---|
 | `status` | The caller must know whether this is a full answer, a degraded one, or an abstention |
+| `degradation_reason`, `output_source` | A degraded answer must say why the primary path failed and which fallback produced the result |
 | `evidence_ids` / `evidence` | A claim with no supporting log line is a hallucination; this makes grounding checkable |
 | `citations` | The answer must be traceable to *your* runbooks, not the model's memory |
-| `escalate` | The system's most valuable output is sometimes "a human should do this" |
-| `prompt_version`, `model` | When quality changes next week, you must know what produced this answer |
-| `tokens`, `latency_ms` | AI features have a per-request cost and a latency budget; invisible cost is a production incident waiting to happen |
+| `needs_escalation` | The system's most valuable output is sometimes "a human should do this" |
+| `unsupported`, `unsupported_reason` | Honest abstention must be representable by the same schema; an unsupported answer is valid data, not malformed output |
+| `prompt_version`, `model`, `decoding_config_version` | When quality changes next week, you must reconstruct the exact prompt, weights, quantisation, and output constraint that produced this answer |
+| `tokens`, `queue_ms`, `latency_ms`, `generation_tokens_per_second` | Tokens consume finite KV cache and GPU time; these fields expose per-request capacity demand and saturation |
 
 ### Who uses it
 
 - **Tier-1 support engineers** — get a consistent first diagnosis instead of guessing.
 - **Senior engineers** — receive a clean escalation packet instead of "it's broken".
-- **You, the operator** — can measure answer quality, abstention rate, latency, and cost per diagnosis.
+- **You, the operator** — can measure answer quality, abstention rate, latency, capacity consumption, and allocated compute cost per diagnosis.
 
 ### What it deliberately does NOT do
 
@@ -97,7 +116,7 @@ This restriction is intentional and defensible: an LLM that can run commands on 
 | APIs and backend systems | The whole product is a versioned REST API with auth, validation, and a database |
 | AI applications | LLM diagnosis, structured output, RAG over runbooks, guardrails, evaluation |
 | Cloud-native solutions | Containers, CI/CD, queues, cache, scaling, monitoring |
-| Azure | Deployed on Azure Container Apps with managed Postgres, Blob, Key Vault, Monitor |
+| Deployment | Real-data production candidate on company infrastructure; synthetic-only Azure portability target using Container Apps and managed services |
 | Working with data scientists / product | Evaluation datasets, quality metrics, measurable user journeys |
 
 A todo app teaches none of the AI parts. A "chat with your PDF" demo teaches none of the backend parts. This one requires both.
@@ -111,13 +130,13 @@ A todo app teaches none of the AI parts. A "chat with your PDF" demo teaches non
 | M3 | It's an HTTP service (FastAPI) with a versioned contract — but state is still in memory |
 | M4 | PostgreSQL persistence, transactions, migrations — restarts stop losing data |
 | M5 | Multi-tenant auth: users, tenants, roles, secure log upload |
-| M6 | **First LLM diagnosis** end-to-end, marked experimental, with token/latency logging |
+| M6 | **First LLM diagnosis** end-to-end, marked experimental, with token/latency/capacity logging |
 | M7 | Structured output + schema validation + retries + timeouts + fallback/abstain |
 | M8 | RAG: your runbooks ingested, chunked, embedded, retrieved, cited |
 | M9 | Evaluation datasets, guardrails, regression gates, human escalation |
 | M10 | Background workers, queue, cache, bounded read-only tools |
 | M11 | Observability (traces/metrics/logs), Docker, full CI/CD |
-| M12 | Deployed on Azure with IaC, scaling, alerting, rollback, failure drills |
+| M12 | On-prem production candidate plus synthetic-only Azure target, with IaC, scaling, alerting, rollback, failure drills |
 
 **The rule:** each milestone changes the *architecture*, not just adds a feature. You should be able to draw the difference between M(n-1) and M(n) on a whiteboard.
 

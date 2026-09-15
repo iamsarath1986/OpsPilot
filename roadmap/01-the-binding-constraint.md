@@ -17,7 +17,7 @@ It removes the single largest open question at the top of the project, and it re
 - **It kills a whole class of rework.** The alternative — building against a hosted API and discovering the constraint in month seven — would have invalidated the provider adapter, the cost model, the capacity plan, and the entire Milestone 12 deployment. Learning this now costs nothing.
 - **It is the harder engineering, which is the point.** Anyone can call a hosted API. Serving your own model, getting reliable structured output out of it without a vendor's JSON mode, sizing GPU concurrency, and proving quality on your own eval set is a materially rarer skill set. It reads better on a CV and interviews better, because there is more to say.
 - **It fits the employer exactly.** A hosting company owns racks and runs its own data centre. Self-hosting is not an exotic burden here — it is the house competency. The project stops being "an AI thing Sarath is trying" and starts being something the company could actually operate.
-- **The unit economics invert in your favour.** Per-token billing punishes exactly the workload this is: long log excerpts, many tickets, retries, evaluation runs. A fixed GPU cost does not. Re-running a 300-case eval suite forty times during Milestone 9 is free on your own hardware and a budget conversation on someone else's.
+- **The unit economics invert in your favour.** Per-token billing punishes exactly the workload this is: long log excerpts, many tickets, retries, evaluation runs. Self-hosting removes the marginal provider invoice, although GPU time, energy, contention, and operations are still real costs that the capacity ledger must expose.
 
 ## What actually changes — and what does not
 
@@ -58,19 +58,32 @@ Approaches, roughly in order of how much you should prefer them:
 
 ## Choosing the model
 
-Do not pick a model now, and do not pick it from a leaderboard. The selection procedure *is* Milestone 9, applied early:
+Do not pick a model from a leaderboard. Use the Milestone 9 method in **two passes** so model selection does not depend on the post-demo request for closed tickets.
 
-1. Build the eval set first (30–50 cases minimum, including the unanswerable ones).
+| Pass | Dataset | Decision |
+|---|---|---|
+| **Bootstrap, at the start of Milestone 6** | 12–20 synthetic cases covering the top ticket types — confirmed by ops where answered, otherwise the discovery hypotheses with ops reviewing the category list — including at least 4 unanswerable cases. Ops reviews the scenarios and reference facts; no customer data is required. | Choose a **provisional, reversible demo model**. These results compare candidates but make no claim about production quality. |
+| **Confirmation, after the demo and completed in Milestone 9** | Approved sanitised closed tickets with known resolutions, expanded with synthetic boundary and adversarial cases into the full versioned evaluation set. | Confirm or replace the provisional model before any pilot or production claim. This is the release decision. |
+
+For each pass:
+
+1. Define the cases and quality bar before running candidates.
 2. Shortlist 3–4 open-weight instruction-tuned models across two size tiers — something in the 7–14B range and something in the 24–32B range.
-3. Run all of them against the same eval set, at temperature 0, with the same prompt and the same constrained-decoding setup.
-4. Record for each: correctness on your slices, groundedness, abstention behaviour, tokens/second under one request and under eight concurrent, and VRAM footprint at your chosen quantisation.
-5. Pick the smallest model that clears your quality bar. Not the best one — the smallest sufficient one. Headroom is throughput.
+3. Run all of them against the same set, at temperature 0, with the same prompt and serving configuration. In the confirmation pass, also use the same constrained-decoding setup.
+4. Record for each: correctness on the available slices, abstention behaviour, tokens/second under one request and under eight concurrent requests, and VRAM footprint at the quantisation you will deploy. Add groundedness once the runbook corpus exists.
+5. Pick the smallest model that clears the stated bar. If none clears it, use the best bootstrap candidate only for the labelled demo and narrow the demo's claims.
+
+The bootstrap set is checked into `evals/bootstrap/` with provenance `synthetic`, its limitations, and ops sign-off. It must never be silently promoted into evidence of live-ticket performance. The post-demo ticket request remains deliberately post-demo; it no longer blocks the demo that earns permission for that request.
 
 Verify the current state of the open-weight field at the time you choose; it moves faster than any document. What is stable is the *method* above, and two rules of thumb: instruction-tuned beats base for this task, and a well-prompted smaller model with good retrieval usually beats a larger one with poor retrieval.
 
 **Quantisation is a quality decision, not just a memory one.** Evaluate the quantised weights you will actually deploy, never the full-precision version, or your eval numbers describe a system you are not running.
 
 **You also need an embedding model and probably a reranker**, both self-hosted, both chosen by the same method against retrieval metrics (recall@K, MRR) rather than by reputation. Embedding models are small and cheap to serve; this is not the expensive part.
+
+## The runbook corpus is a programme dependency
+
+Milestone 8 cannot manufacture its source material during an engineering sprint. Discovery has not yet established whether usable written runbooks exist — ops has not been asked directly. As a deliberately conservative planning assumption, plan as though they do not: begin a parallel authoring workstream during discovery, nominate an operations owner, reserve a recurring review slot, and track 20–30 runbooks through draft, technical review, approval, and versioned publication. Milestone 8 starts only after that corpus-readiness gate is green. See [Discovery](02-discovery-with-operations.md) and [Milestone 8](milestone-08-rag.md).
 
 ## Serving
 
@@ -80,13 +93,21 @@ Verify the current state of the open-weight field at the time you choose; it mov
 | **llama.cpp / Ollama** | Local development, your laptop, CPU fallback | Easiest to run, excellent grammar support, much lower throughput under concurrency |
 | **TGI or similar** | Alternative production server | Comparable to vLLM; choose on ecosystem fit, not benchmarks |
 
-A pragmatic split: develop against the easy local option so Milestones 6–9 are not gated on hardware, and target the high-throughput server for anything the ops team will actually use. The provider port makes this a configuration change, which is the entire reason the port exists.
+A pragmatic split: develop *features* against the easy local option, and target the high-throughput server for anything the ops team will actually use. The provider port makes this a configuration change, which is the entire reason the port exists.
+
+**What a laptop cannot give you is a capacity number.** Prompt construction, validation, retries, the state machine, and retrieval can all be built and tested against a local server or the fake adapter. But the concurrency knee, KV-cache pressure, tokens/s, and VRAM footprint are properties of one specific combination of GPU, model, quantisation, and serving stack. A limit measured on a laptop running llama.cpp says nothing about a GPU host running vLLM. Therefore:
+
+- **GPU access is a gate, not an assumption.** Milestone 6's capacity exercises (the concurrency curve and bootstrap model selection) require access to target-class hardware — the GPU type and serving stack you expect to deploy on. Track this as an early workstream in the [README](README.md); ask for it during discovery, because hardware allocation has a longer lead time than code.
+- **Every capacity limit is tagged with the configuration that produced it.** ADR-007 records the in-flight limit, queue depth, and queue-wait bound together with the GPU model, VRAM, model revision, quantisation, serving stack and version, and maximum context length.
+- **Any change to that configuration invalidates the limits.** Re-run the Milestone 6 concurrency curve and re-derive the Milestone 7 bulkhead whenever any tagged component changes — including the move from a development GPU to production hardware in Milestone 12. A limit whose configuration no longer matches the deployment is treated as unknown, not as approximately right.
+
+If target-class hardware is not yet available when Milestone 6 starts, build the milestone's software against the local server, mark the capacity exercises and the provisional model selection as **blocked**, and escalate the hardware request. Do not substitute laptop numbers.
 
 **Hardware, in the range this project needs:** a quantised model in the 7–14B class fits comfortably on a single 24 GB GPU and will serve an internal support tool with modest concurrency. The 24–32B class needs more, or heavier quantisation, or both. CPU-only inference works for development and is too slow for interactive use. Before promising anything, ask what hardware actually exists and who controls it — see the open questions below.
 
 ## Capacity: the ceiling moves, it does not disappear
 
-Milestone 6 teaches provider RPM/TPM quotas as the throughput ceiling. Self-hosting replaces that ceiling with a different one, and the new one is arguably more instructive because you own both sides of it:
+Milestone 6 measures the self-hosted throughput ceiling directly rather than treating provider RPM/TPM as the constraint. The ceiling is arguably more instructive because you own both sides of it:
 
 - Concurrency is bounded by **GPU memory** — model weights plus KV cache per active request. Long log excerpts inflate KV cache fast.
 - Throughput is bounded by **batching efficiency**. This is why continuous batching matters.
@@ -140,4 +161,4 @@ Record these honestly, as with every ADR:
 
 ---
 
-**Next:** this changes nothing about where you start. [Milestone 1](milestone-01-domain-and-parsing.md) has no model in it at all — which is exactly why it comes first.
+**Next:** engineering starts with [Milestone 1](milestone-01-domain-and-parsing.md), which has no model in it. In parallel, start the runbook-authoring workstream in [Discovery](02-discovery-with-operations.md) now; its calendar lead time is longer than its code dependency suggests.

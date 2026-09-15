@@ -19,7 +19,7 @@
 | Structured logs with correlation IDs | The field you added in Milestone 2 finally pays off: log line → trace → request. |
 | RED and USE metric methods | Rate, Errors, Duration for requests; Utilisation, Saturation, Errors for resources. Two checklists that cover most of what you need. |
 | Metric cardinality | A label containing an incident ID creates millions of time series and a very large bill. This is the classic self-inflicted observability outage. |
-| AI-specific telemetry | Prompt version, model, tokens in and out, cost, retrieval hit rate, guardrail trips, abstention rate, outcome state. Without these, an AI regression is invisible in ordinary metrics. |
+| AI-specific telemetry | Prompt version, model revision/quantisation, decoding configuration, tokens in and out, queue time, tokens/s, allocated compute cost, retrieval hit rate, guardrail trips, abstention rate, outcome state, `degradation_reason`, and `output_source`. The last three are bounded enums, not free-text labels. |
 | What *not* to record | Prompt and response bodies contain customer data. Sampling, redaction, and retention policy are mandatory, not optional. |
 | SLIs, SLOs, error budgets | Turns reliability into a number that decides whether you ship a feature or fix stability. |
 | Alerting on symptoms, not causes | Alert on "users are getting errors", not on "CPU is 80%". Cause-based alerts produce noise and get muted. |
@@ -42,7 +42,7 @@
 |---|---|---|
 | Tracing | **Productionize** | One trace shows API, DB, retrieval, model, and worker spans, correlated |
 | Metrics | **Design** | You chose your metrics and labels deliberately, with cardinality in mind |
-| AI telemetry | **Productionize** | You can answer "why did quality or cost change last week?" from dashboards |
+| AI telemetry | **Productionize** | You can answer "what fraction degraded, why, and which fallback produced the answer?" as well as why quality, latency, or capacity changed |
 | SLOs and alerts | **Design** | Every alert is symptom-based and has a runbook |
 | Load testing | **Debug** | You found a real bottleneck and fixed or documented it |
 | Docker | **Productionize** | Multi-stage, non-root, scanned, with health checks and graceful shutdown |
@@ -70,18 +70,19 @@
 | Cross-process context | Traces die at the queue | Inject and extract trace context in message headers | Worker spans join the API's trace |
 | Structured logs | Correlation between logs and traces | JSON logs carrying `trace_id`, `span_id`, `request_id`, tenant | Every request log line is correlatable |
 | RED metrics | Basic service health | Request rate, error rate, duration histograms by route and status | Metrics appear with bounded label sets |
-| AI metrics | Quality and cost are invisible otherwise | Tokens, cost, latency by stage, retrieval hit rate, guardrail trips, abstention and escalation rates, outcome-state counts, all by prompt version and model | Dashboard answers "what changed after the last prompt release?" |
-| Privacy controls | Telemetry becomes a data leak | Redacting span processor, sampled prompt capture, explicit retention | A test asserting no raw customer content reaches span attributes |
+| AI metrics | Quality and capacity use are invisible otherwise | Tokens, queue time, tokens/s, allocated compute cost, latency by stage, retrieval hit rate, guardrail trips, abstention/escalation rates, and outcome counts broken down by bounded `degradation_reason` and `output_source`, sliced by prompt, model revision/quantisation, and decoding configuration | Dashboard answers "what fraction degraded, why, and what changed after the last release?" |
+| Privacy controls | Telemetry becomes a data leak | Redacting span processor, no raw prompt/response body export, bounded redacted metadata, explicit retention | A test asserting no raw customer content reaches span attributes or exporter payloads |
+| Egress-policy gate | Telemetry adds another outbound path after model, embedding, rerank, and judge calls | Extend the standing deny-by-default job with the configured telemetry exporter; allowlist the approved internal backend and assert raw marker content is redacted before export | CI fails on any unapproved destination or any unredacted marker in a telemetry export |
 
 ### Step 2 — Dashboards, SLOs, and alerts
 
-Four dashboards: user experience (rate, errors, latency by endpoint), AI quality and cost (outcome states, abstention, tokens, cost per successful diagnosis), system health (pool usage, queue depth, worker throughput, cache hit rate), and dependencies (provider errors, breaker state, rate-limit rejections).
+Four dashboards: user experience (rate, errors, latency by endpoint); AI quality and capacity (outcome states, degraded fraction split by `degradation_reason` and `output_source`, abstention, tokens, GPU time and allocated cost per successful diagnosis); system health (pool usage, inference queue depth, worker throughput, cache hit rate); and dependencies (inference-server errors, breaker state, overload rejections).
 
-Then four alerts, each with a runbook: elevated user-facing error rate; p95 latency beyond the SLO; queue lag or DLQ growth; and provider-failure or circuit-breaker-open. Symptom-based only. An alert without a runbook is a 3 a.m. puzzle.
+Then four alerts, each with a runbook: elevated user-facing error rate; p95 latency beyond the SLO; queue lag or DLQ growth; and inference degradation beyond its reason-specific budget — including any `decoder_constraint_unavailable`, sustained `capacity_saturated`, primary failure, or circuit-breaker-open. Symptom-based only. An alert without a runbook is a 3 a.m. puzzle.
 
 ### Step 3 — Load testing
 
-k6 or Locust scripts for the three main paths. Report format: environment, traffic model, arrival rates, p50/p95/p99, error rate, the saturating resource, and what you changed. Record the model-provider concurrency limit — in Milestone 12 that quota, not your servers, is likely to be your ceiling.
+k6 or Locust scripts for the three main paths. Report format: environment, traffic model, arrival rates, p50/p95/p99, error rate, the saturating resource, and what you changed. Record the self-hosted inference ceiling: concurrent sequences, KV-cache pressure, tokens/s, queue growth, and the arrival rate at which latency collapses. Milestone 12 uses those measurements for admission control and maximum replica counts.
 
 ### Step 4 — Containers
 
@@ -93,7 +94,7 @@ A `docker-compose.yml` bringing up the full stack — API, worker, PostgreSQL wi
 
 ```
 lint → types → unit → component → integration (real Postgres) → security scan
- → small eval suite → build image → scan image → push by digest → deploy (M12)
+ → egress-policy → small eval suite → build image → scan image → push by digest → deploy (M12)
 ```
 
 Plus nightly full evaluation and a scheduled dependency scan. Build once, tag by digest, promote the same digest. Secrets via OIDC federation rather than long-lived credentials — set up properly in Milestone 12. Branch protection requiring the pipeline to pass.
@@ -102,7 +103,7 @@ Plus nightly full evaluation and a scheduled dependency scan. Build once, tag by
 
 **Before:** a capable system you could only understand by reading code.
 
-**After:** every request traceable across processes, quality and cost visible on dashboards, SLOs with symptom-based alerts and runbooks, a measured capacity limit and known bottleneck, hardened images with graceful shutdown, and a pipeline producing one gated, promotable artifact.
+**After:** every request traceable across processes, quality and inference-capacity use visible on dashboards, SLOs with symptom-based alerts and runbooks, a measured capacity limit and known bottleneck, hardened images with graceful shutdown, and a pipeline producing one gated, promotable artifact.
 
 **Architecturally:** unchanged in shape, transformed in operability. This is the milestone that makes the difference between a system you built and a system you can run.
 
@@ -110,7 +111,9 @@ Plus nightly full evaluation and a scheduled dependency scan. Build once, tag by
 
 - A test asserting a complete trace for one diagnosis request, including worker spans.
 - A test asserting no raw prompt or customer data appears in span attributes or logs.
+- The standing `egress-policy` job now covers generation, embeddings, reranking, judging, and telemetry in one deny-by-default integration flow; raw marker content is expected only at allowlisted internal AI endpoints and must be absent from telemetry exports. In CI every allowlisted endpoint, including the telemetry backend, is a recording stub on the isolated network, so the job needs no GPU or live model.
 - Metric cardinality check: assert label sets are bounded.
+- Outcome telemetry test: every degraded result increments exactly one known reason/source combination; complete results do not acquire a degradation reason.
 - Container tests: non-root user, health endpoints, and graceful shutdown under `SIGTERM` mid-request.
 - Load-test report committed with the environment and conditions stated.
 - Pipeline verification: deliberately fail each gate and confirm the expected stage catches it.
@@ -133,7 +136,7 @@ Plus nightly full evaluation and a scheduled dependency scan. Build once, tag by
 ## 8. Skills Gained
 
 - OpenTelemetry instrumentation with cross-process context propagation
-- Metric design with cardinality awareness, and AI-specific quality and cost telemetry
+- Metric design with cardinality awareness, and AI-specific quality, capacity, and allocated-cost telemetry
 - Privacy-aware observability — a genuinely differentiating skill in AI systems
 - SLOs, symptom-based alerting, and runbooks
 - Load testing to find real bottlenecks, and reasoning about tail latency
@@ -148,10 +151,12 @@ Plus nightly full evaluation and a scheduled dependency scan. Build once, tag by
 - [ ] I broke trace propagation across the queue and fixed it.
 - [ ] I caused a cardinality explosion and can state my labelling rule.
 - [ ] No raw prompt, response, or customer data reaches logs or spans — with a test.
+- [ ] The standing `egress-policy` CI job covers every outbound AI and telemetry surface, fails on unapproved destinations, and proves raw marker content is absent from telemetry exports.
 - [ ] I can answer "what changed after the last prompt release?" from a dashboard.
+- [ ] I can answer "what fraction of answers degraded, why, and from which output source?" and alert on reason-specific budgets.
 - [ ] Every alert is symptom-based and has a runbook.
 - [ ] I load-tested to saturation and can name the first bottleneck and the fix.
-- [ ] I know the provider concurrency or token-rate limit that caps my throughput.
+- [ ] I know the measured inference concurrency/KV-cache limit and tokens/s ceiling that cap my throughput.
 - [ ] Images are multi-stage, non-root, scanned, and contain no secrets.
 - [ ] A `SIGTERM` mid-request completes gracefully; a worker's message is redelivered, not lost.
 - [ ] I deliberately failed each CI gate and confirmed which stage caught it.
@@ -161,4 +166,4 @@ Plus nightly full evaluation and a scheduled dependency scan. Build once, tag by
 
 ---
 
-**Next:** Milestone 12 puts it on Azure — infrastructure as code, managed identity, autoscaling, alerting, failure drills, restore, rollback, and a cost model.
+**Next:** Milestone 12 proves the real-data on-premises target and the synthetic-only Azure portability target — infrastructure as code, workload identity, autoscaling/admission control, alerting, failure drills, restore, rollback, and a cost model.

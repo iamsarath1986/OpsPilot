@@ -14,8 +14,8 @@
 |---|---|
 | Synchronous versus asynchronous work | A 4-minute ingestion job cannot hold an HTTP connection. Users need a job ID and a status endpoint instead. |
 | Job lifecycle and status endpoints | `queued → running → succeeded / failed`, with progress and errors visible to the caller. |
-| Message brokers and delivery semantics | At-least-once is what you actually get. Exactly-once is mostly a marketing claim, and designing as if you have it causes duplicate charges. |
-| Idempotent consumers | Since messages *will* be redelivered, handlers must be safe to run twice. Without this, one duplicate embeds 5,000 chunks a second time and doubles the bill. |
+| Message brokers and delivery semantics | At-least-once is what you actually get. Exactly-once is mostly a marketing claim, and designing as if you have it causes duplicate work. |
+| Idempotent consumers | Since messages *will* be redelivered, handlers must be safe to run twice. Without this, one duplicate embeds 5,000 chunks a second time and doubles GPU work and queue occupancy. |
 | The dual-write problem | Committing to the database and publishing to a broker are two operations that can half-fail. |
 | The outbox pattern | Write the message to the same transaction as the data, publish from there. The standard fix, and a strong interview topic. |
 | Dead-letter queues | Poison messages must leave the queue without blocking everything behind them — and someone must be told. |
@@ -30,7 +30,7 @@
 | Cache as a *disposable* dependency | If Redis dies, the system must slow down, not fall over. |
 | Tool/function calling design | Give the model capabilities through a typed, authorised, budgeted registry — not raw access. |
 | Tool authorization and parameter validation | The model proposes; your code decides. A tool call is an untrusted request that must pass the same authorization as an HTTP request. |
-| Loop and cost budgets for tool use | Without a bound, a model can loop until your quota is exhausted. |
+| Loop and capacity budgets for tool use | Without a bound, a model can loop until inference capacity is exhausted. |
 | State machine versus autonomous agent | A bounded workflow is testable, explainable, and safe. Full autonomy is neither — and you should be able to say why you chose the former. |
 
 ## 2. Learning Depth
@@ -48,13 +48,13 @@
 ## 3. Hands-On Learning Exercises
 
 1. **The dual-write failure.** Commit a row, then crash before publishing the message. The work is lost with no error anywhere. Implement the outbox and reproduce the crash — the message survives. This experiment teaches more about distributed systems than any article.
-2. **Duplicate delivery.** Deliver the same embedding message twice. Measure the doubled cost. Add an idempotency key. Deliver it twice again and confirm one execution.
+2. **Duplicate delivery.** Deliver the same embedding message twice. Measure the doubled GPU time and queue occupancy. Add an idempotency key. Deliver it twice again and confirm one execution.
 3. **Poison message.** Send one that always throws. Watch it redeliver forever and block the queue. Add retry limits and a DLQ, then replay it after a fix.
 4. **Queue lag.** Publish 10,000 messages, run one worker, and graph depth over time. Add a second worker. Derive your throughput per worker — the number you will use for autoscaling in Milestone 12.
-5. **Cache stampede.** Expire a hot key, fire 100 concurrent requests, and count model calls. Add single-flight or a lock. Count again. Then compute what the difference would cost per month at real traffic.
+5. **Cache stampede.** Expire a hot key, fire 100 concurrent requests, and count model calls. Add single-flight or a lock. Count again. Then project the GPU-seconds, queue delay, and saturation headroom consumed at real traffic.
 6. **Distributed limit.** Run two API replicas with your Milestone 7 in-process limiter. Observe double the intended rate. Move to a Redis token bucket and re-measure.
 7. **Kill the cache.** Stop Redis with the system under load. It must degrade, not fail. If it fails, you have made the cache a hard dependency by accident — a very common production outage.
-8. **Runaway tool loop.** Let the model call tools without a budget and watch it loop. Add a call limit and a cost ceiling.
+8. **Runaway tool loop.** Let the model call tools without a budget and watch it loop. Add a call limit and an inference-capacity ceiling.
 9. **Hostile tool arguments.** Have the model request `get_incident` with another tenant's ID. Your authorization layer must reject it exactly as it would reject an HTTP request.
 
 ## 4. Project Implementation
@@ -65,7 +65,7 @@
 |---|---|---|---|
 | Job records | Callers need visibility into long work | `jobs` table: type, status, progress, error, tenant, correlation ID; `GET /v1/jobs/{id}` | Status transitions; a failed job reports a useful reason |
 | Outbox | Dual-write loses or duplicates work | `outbox` table written in the same transaction; a publisher process drains it | Crash between commit and publish; message still delivered |
-| Broker adapter | The broker changes in Milestone 12 | A port with a local implementation now, Azure Service Bus later | Contract tests both implementations must pass |
+| Broker adapter | The broker changes by deployment target in Milestone 12 | A port with a local implementation now, an approved company broker for real data, and Azure Service Bus for the synthetic target | Contract tests every implementation must pass |
 | Idempotent handlers | Redelivery is guaranteed, not exceptional | A processed-message table or natural idempotency keys | Handler executed twice produces one effect |
 | DLQ and replay | Poison messages must not block the queue | Retry limit, DLQ, and an operator replay command | Poison message lands in DLQ; replay succeeds after fix |
 
@@ -87,7 +87,7 @@ Three read-only tools, each with a typed schema, an authorization check, and an 
 | `search_runbooks(query, filters)` | Targeted retrieval beyond the initial context | Read, visibility-scoped |
 | `check_service_status(service)` | Synthetic or internal status endpoint | Read-only, no customer data |
 
-Rules, all enforced in code rather than in the prompt: every tool call is authorised against the *caller's* principal, never the model's request; arguments are validated like any untrusted input; the loop is bounded by call count, wall time, and token cost; every call is recorded with arguments, result size, latency, and outcome.
+Rules, all enforced in code rather than in the prompt: every tool call is authorised against the *caller's* principal, never the model's request; arguments are validated like any untrusted input; the loop is bounded by call count, wall time, tokens, and inference capacity; every call is recorded with arguments, result size, latency, and outcome.
 
 **Write no tools that change anything.** Document what would be required before a write tool could exist: an isolated environment, per-action authorization, dry-run with a diff, explicit human approval, idempotency, a compensating action, and adversarial evaluation. Being able to list those requirements is more impressive than having built a tool that runs `chmod`.
 
@@ -117,7 +117,7 @@ Keep the deterministic pipeline: retrieve → optionally call a bounded tool →
 ## 7. Failure Scenarios to Reproduce Deliberately
 
 1. Dual-write loss: committed data, unpublished message, silent gap.
-2. Duplicate delivery doubling embedding cost — measure the money.
+2. Duplicate delivery doubling embedding work — measure the GPU time and queue impact.
 3. Poison message blocking the queue.
 4. DLQ filling with nobody watching. (Add the alert in Milestone 11 and note the dependency now.)
 5. Worker OOM on an unusually large document; find the bound that prevents it.
@@ -125,7 +125,7 @@ Keep the deterministic pipeline: retrieve → optionally call a bounded tool →
 7. Cache stampede after a hot key expires.
 8. Two replicas each enforcing a local limit, permitting double the intended rate.
 9. Worker concurrency set too high, exhausting the database connection pool — the Milestone 4 failure, now arriving from a new direction.
-10. Tool loop without a budget, burning quota.
+10. Tool loop without a budget, monopolising inference capacity.
 11. Tool called with another tenant's incident ID.
 12. A job that succeeded but whose status was never updated, leaving a caller polling forever.
 
@@ -148,7 +148,7 @@ Keep the deterministic pipeline: retrieve → optionally call a bounded tool →
 - [ ] I have sent a message to the DLQ and replayed it after a fix.
 - [ ] I know my throughput per worker and my queue-lag behaviour under burst.
 - [ ] My cache is genuinely disposable — I killed Redis under load and the system degraded.
-- [ ] I caused a cache stampede and fixed it, and can state the cost saved.
+- [ ] I caused a cache stampede and fixed it, and can state the GPU time and queue headroom saved.
 - [ ] Rate limits hold correctly across two replicas, and I can explain fail-open versus fail-closed for mine.
 - [ ] Every tool call is authorised against the caller, argument-validated, budgeted, and audited.
 - [ ] A tool call for another tenant's data is rejected — with a test.

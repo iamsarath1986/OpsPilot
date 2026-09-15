@@ -7,6 +7,7 @@ One product, built in twelve milestones. Written to be *done*, not just read.
 | File | What it covers |
 |---|---|
 | [00-what-you-are-building.md](00-what-you-are-building.md) | The project in plain language: the problem, an example request and response, who uses it, how it grows |
+| [01-the-binding-constraint.md](01-the-binding-constraint.md) | ADR-000: customer data stays on company infrastructure; inference, embeddings, reranking, and judging are self-hosted |
 | [02-discovery-with-operations.md](02-discovery-with-operations.md) | Questions for the operations team, shared-hosting pain points, and what ops has told us so far |
 
 ## The milestones
@@ -24,9 +25,26 @@ One product, built in twelve milestones. Written to be *done*, not just read.
 | 9 | [Evaluation and guardrails](milestone-09-evaluation-and-guardrails.md) | Eval datasets, judges, guardrails, release gates, escalation | 5–6 |
 | 10 | [Async work and tools](milestone-10-async-work-and-tools.md) | Queues, workers, outbox, DLQ, shared cache, bounded read-only tools | 4–5 |
 | 11 | [Observability, Docker, CI/CD](milestone-11-observability-docker-cicd.md) | Tracing, metrics, SLOs, load testing, hardened images, pipeline | 4–5 |
-| 12 | [Azure production](milestone-12-azure-production.md) | Bicep, managed identity, ACA, scaling, alerts, drills, restore, rollback | 6–8 |
+| 12 | [On-prem production and Azure portability](milestone-12-azure-production.md) | Real-data on-prem target, synthetic-only Azure target, IaC, identity, scaling, drills | 6–8 |
 
 Roughly 9–12 months at 10–15 focused hours per week. The weeks are planning ranges, not permission to advance.
+
+## Cross-cutting work that starts early
+
+The numbered milestones describe the engineering sequence; they are not the schedule for work that depends on other people.
+
+| Workstream | Start | Gate it must clear |
+|---|---|---|
+| Runbook corpus | Discovery, in parallel with Milestones 1–7 | 20–30 reviewed, versioned runbooks before Milestone 8 implementation begins |
+| GPU access | Discovery; request it well before Milestone 6 | Access to target-class hardware (the GPU type and serving stack you expect to deploy on) before Milestone 6's concurrency curve and model selection. Without it those exercises are blocked — laptop numbers are not a substitute |
+| Provisional model selection | Start of Milestone 6, on target-class hardware | 12–20 synthetic, ops-reviewed cases are enough to choose a reversible demo model |
+| Synthetic-data demo | Final week of Milestone 7 (Step 8) | Ops has seen validated, degraded, and abstained results on synthetic data, with no real-ticket quality claimed |
+| Closed-ticket request | Same week as the demo, through your manager | Approved sanitised closed tickets arrive in time for labelling at the start of Milestone 9 |
+| Production model confirmation | Milestone 9, Step 6 | Approved tickets plus synthetic/adversarial cases support the full evaluation pass |
+
+Capacity limits are measured, not carried: whenever the GPU, model revision, quantisation, serving stack, or context length changes, the Milestone 6 concurrency curve is re-run and the Milestone 7 limits re-derived.
+
+The 5–6 weeks shown for Milestone 8 are engineering time for ingestion and retrieval. They do **not** include waiting for operations staff to author and approve the source material.
 
 ## How every milestone is structured
 

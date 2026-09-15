@@ -6,7 +6,11 @@
 
 **Why after reliability, not before:** retrieval adds a second failure surface. Debugging "was that the retrieval or the model?" is only tractable when the model path is already validated and observable.
 
-**Time:** 5–6 focused weeks. **Prerequisite:** Milestone 7 checklist green.
+**Time:** 5–6 focused engineering weeks; corpus authoring is a separate calendar-bound workstream that began during discovery. **Prerequisites:** Milestone 7 checklist green, and the corpus-readiness gate below green.
+
+### Corpus-readiness gate
+
+Do not start the ingestion implementation while source material is still hypothetical. Operations must have approved 20–30 versioned runbooks with named owners and review dates, covering enough of the prioritised ticket categories to label at least 40 retrieval questions. If this gate is red, continue infrastructure-independent learning exercises and escalate the schedule risk; do not fill the gap with model-generated operational policy.
 
 ---
 
@@ -20,15 +24,15 @@
 | Chunking strategies: fixed, recursive, structural, semantic | A chunk is the unit of retrieval. Split a five-step fix across two chunks and you retrieve half a procedure. |
 | Chunk overlap | Recovers context lost at boundaries — at the cost of duplication and storage. |
 | Embeddings and vector space | What "semantic similarity" actually measures, and why it is not the same as relevance. |
-| Embedding model choice, dimensionality, cost, multilingual support | Directly affects recall, storage, and latency. Your hosting customers may not all write in English. |
+| Embedding model choice, dimensionality, compute, multilingual support | Directly affects recall, storage, latency, and self-hosted capacity. Your hosting customers may not all write in English. |
 | Similarity metrics: cosine, inner product, L2 | Must match how the embedding model was trained, or your results quietly degrade. |
 | `pgvector` and index types (HNSW, IVFFlat) | Exact search is fine at 10k chunks and unacceptable at 10M. Index parameters trade recall for speed. |
 | Lexical search (PostgreSQL full-text, BM25) | Vector search is poor at exact tokens — error codes, file paths, `0555`, `ERR_CONNECTION_REFUSED`. Lexical search excels there. Hosting support is full of exact tokens. |
 | Hybrid retrieval and Reciprocal Rank Fusion | Combines both strengths without hand-tuned score weighting. |
 | Metadata filtering | Filter by product, OS, control panel, and — critically — tenant visibility. |
 | Authorization-aware retrieval | The retriever must never surface a document the caller may not read. A leak here is a data breach with a citation attached. |
-| Top-K and context budget | More chunks means more cost, more latency, and often *worse* answers as noise crowds out signal. |
-| Reranking (cross-encoder or LLM-based) | Retrieve broadly, then rank precisely. Adds latency and cost, so it must earn its place with numbers. |
+| Top-K and context budget | More chunks means more compute, more latency, and often *worse* answers as noise crowds out signal. |
+| Reranking (self-hosted cross-encoder or local model) | Retrieve broadly, then rank precisely. Adds latency and capacity demand, so it must earn its place with numbers. |
 | Corpus versioning | Answers change when documents change. Reproducibility requires knowing which corpus produced an answer. |
 | Retrieval metrics: recall@K, precision@K, MRR, nDCG | You cannot improve retrieval by looking at answers. You must measure the retrieval step in isolation. |
 | Groundedness and citation accuracy | Whether each claim is supported by retrieved text — the practical definition of "not hallucinating". |
@@ -42,17 +46,17 @@
 | `pgvector` and indexes | **Debug** | You can explain a slow vector query and the recall cost of the index parameters you set |
 | Hybrid retrieval | **Design** | You can show, per query type, where lexical beats vector and vice versa |
 | Authorization in retrieval | **Productionize** | Filtering happens in the query, not after — and tests prove no unauthorised chunk is ever fetched |
-| Reranking | **Design** | You can state its measured benefit against its measured latency and cost |
+| Reranking | **Design** | You can state its measured benefit against its measured latency and capacity demand |
 | Retrieval evaluation | **Implement** | You can report recall@5 with a labelled set and a confidence caveat |
 
 ## 3. Hands-On Learning Exercises
 
-Build a small labelled set first: 40 real support questions, each with the runbook chunk IDs that *should* be retrieved. Everything below depends on it.
+Build a small labelled set first: 40 ops-authored or ops-approved support questions, each with the runbook chunk IDs that *should* be retrieved. These may be synthetic scenarios; label their provenance honestly. Everything below depends on it.
 
 1. **Chunk sweep.** Sizes 200 / 500 / 1000 tokens × overlap 0% / 10% / 25%. Measure recall@5 for each of the nine combinations. Pick from the table. Keep the table — it is one of the most persuasive artifacts you will produce.
-2. **Embedding comparison.** Two models on the same corpus and queries. Compare recall@5, index size, embedding cost, and query latency. Note that the better model is not automatically the right one.
+2. **Embedding comparison.** Two self-hosted models on the same corpus and queries. Compare recall@5, index size, embedding time, memory demand, and query latency. Note that the better model is not automatically the right one.
 3. **The exact-token test.** Query `0555 permission` and `ERR_TOO_MANY_REDIRECTS`. Compare vector-only, lexical-only, and hybrid retrieval. Vector search often loses badly on exact strings — this experiment is why your system will be hybrid.
-4. **Top-K curve.** K = 1, 3, 5, 10, 20. Measure recall, answer groundedness, latency, and token cost. Find the point where more context stops helping and starts hurting.
+4. **Top-K curve.** K = 1, 3, 5, 10, 20. Measure recall, answer groundedness, latency, and generation capacity consumed. Find the point where more context stops helping and starts hurting.
 5. **Adversarial document.** Add an outdated runbook contradicting a current one. Does retrieval prefer it? Add a `deprecated` metadata flag and filter it. Now you understand why corpus hygiene is an engineering concern, not a documentation concern.
 6. **Boundary split.** Deliberately chunk so a five-step procedure splits after step three. Ask a question needing step four. Watch a confident, incomplete, dangerous answer appear.
 7. **Scale.** Load 50,000 synthetic chunks. Time queries with no index, with IVFFlat, and with HNSW. Vary HNSW parameters and measure the recall/latency trade-off.
@@ -60,11 +64,11 @@ Build a small labelled set first: 40 real support questions, each with the runbo
 
 ## 4. Project Implementation
 
-### Step 1 — Build the corpus
+### Step 1 — Accept and freeze the first corpus release
 
-Write 20–30 real runbooks with your ops team: 500 error after deploy, permission problems, disk and inode quota, mail delivery failures, SSL renewal, database connection limits, compromised WordPress, outbound spam, DNS propagation, slow site triage.
+Import the 20–30 runbooks authored with ops since discovery: 500 error after deploy, permission problems, disk and inode quota, mail delivery failures, SSL renewal, database connection limits, compromised WordPress, outbound spam, DNS propagation, slow site triage. Verify owner, approval, version, review date, and absence of customer data; freeze the release used by the retrieval experiments.
 
-This is genuinely useful to your employer independent of the software, and it is the most valuable deliverable of the discovery conversation in `02-discovery-with-operations.md`. Structure each with clear headings — headings become your chunk boundaries.
+Corpus authoring is genuinely useful to your employer independent of the software, but it is not part of the 5–6-week engineering estimate. Continue the recurring ops review cadence so corrections become new corpus versions. Clear headings in the authoring template become chunk boundaries here.
 
 ### Step 2 — Ingestion pipeline
 
@@ -72,10 +76,10 @@ This is genuinely useful to your employer independent of the software, and it is
 |---|---|---|---|
 | Loader and normaliser | Mixed formats produce inconsistent text | Markdown/HTML/PDF loaders producing normalised text plus metadata | Golden-file tests per format |
 | Structural chunking | Naive splitting severs procedures | Split on headings first, then size-bound with overlap; never split mid-list | Assert no chunk contains a partial numbered procedure |
-| Chunk metadata | Filtering and citation need provenance | `document_id`, heading path, product, OS, visibility, `deprecated`, `corpus_version`, source URL | Metadata round-trip tests |
-| Embedding with batching | One call per chunk is slow and expensive | Batched calls with bounded concurrency, retries reusing the Milestone 7 policy | Cost and latency measured against sequential |
-| Idempotent re-ingestion | Re-running must not duplicate or double-charge | Content hash per chunk; skip unchanged | Re-ingest twice, assert stable row count and near-zero new embedding cost |
-| Corpus versioning | Answers must be reproducible and caches invalidated | A `corpus_version` recorded on chunks, diagnoses, and cache keys | Version bump invalidates the cache from Milestone 7 |
+| Chunk and vector metadata | Filtering, citation, and vector compatibility need provenance | `document_id`, heading path, product, OS, visibility, `deprecated`, `corpus_version`, source URL, `embedding_model`, `embedding_revision`, `embedding_dimensions`, and `embedding_config_version` | Metadata round-trip tests; query rejects a mismatched embedding identity |
+| Embedding with batching | One call per chunk wastes local inference capacity | Batched calls to the self-hosted embedding service with bounded concurrency, reusing the Milestone 7 resilience policy | Compute time and latency measured against sequential |
+| Idempotent re-ingestion | Re-running must not duplicate rows or waste compute | Content hash per chunk; skip unchanged | Re-ingest twice, assert stable row count and near-zero new embedding work |
+| Corpus and embedding versioning | Answers must be reproducible and incompatible vector spaces must never mix | Record `corpus_version` and `embedding_config_version` on chunks, retrieval runs, diagnoses, and cache keys; an embedding change creates a new index namespace and requires re-embedding | Either version bump invalidates the Milestone 7 cache; mixed identities fail closed |
 
 ### Step 3 — Storage and indexing
 
@@ -116,6 +120,7 @@ When retrieval returns nothing above a relevance threshold, the correct behaviou
 - The RAG-versus-no-RAG ablation, recorded with per-slice results.
 - Latency budget: measure retrieval, reranking, and generation separately so you know which to optimise.
 - A corpus-version bump invalidating cached answers.
+- Extend the standing `egress-policy` CI job from M6 to exercise ingestion, query embedding, and reranking; only the allowlisted self-hosted embedding and reranker endpoints may receive marker content.
 
 ## 7. Failure Scenarios to Reproduce Deliberately
 
@@ -146,6 +151,7 @@ When retrieval returns nothing above a relevance threshold, the correct behaviou
 - [ ] I can draw the full pipeline from document to cited answer and explain each stage's failure mode.
 - [ ] My chunk size and overlap come from a measured sweep I can show.
 - [ ] I compared two embedding models on my own labelled queries.
+- [ ] Every stored vector records its embedding model, revision, dimensions, and configuration version; mismatched query and corpus embeddings fail closed.
 - [ ] I can show a query where lexical search beats vector search and explain why.
 - [ ] Authorization filtering happens inside the retrieval query, and tests prove no cross-tenant leak.
 - [ ] Every citation is validated against real, authorised chunks before the response is returned.
@@ -154,6 +160,7 @@ When retrieval returns nothing above a relevance threshold, the correct behaviou
 - [ ] I can state recall@5 on my labelled set, with the set size and its limitations.
 - [ ] I can explain what would justify moving from `pgvector` to a dedicated vector database.
 - [ ] I know what breaks if I swap embedding models without re-embedding — because I did it.
+- [ ] The standing `egress-policy` CI job proves embedding and reranking content can reach only approved self-hosted endpoints.
 - [ ] **ADR-008** records chunking, embedding, hybrid retrieval, and the `pgvector` decision.
 
 ---
