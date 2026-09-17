@@ -58,22 +58,22 @@ Approaches, roughly in order of how much you should prefer them:
 
 ## Choosing the model
 
-Do not pick a model from a leaderboard. Use the Milestone 9 method in **two passes** so model selection does not depend on the post-demo request for closed tickets.
+Do not pick a model from a leaderboard. Use the Milestone 9 method in **two passes**. Both use evaluation data you create yourselves — see [Data we create ourselves](#data-we-create-ourselves) below — because real customer tickets will not be released.
 
 | Pass | Dataset | Decision |
 |---|---|---|
-| **Bootstrap, at the start of Milestone 6** | 12–20 synthetic cases covering the top ticket types — confirmed by ops where answered, otherwise the discovery hypotheses with ops reviewing the category list — including at least 4 unanswerable cases. Ops reviews the scenarios and reference facts; no customer data is required. | Choose a **provisional, reversible demo model**. These results compare candidates but make no claim about production quality. |
-| **Confirmation, after the demo and completed in Milestone 9** | Approved sanitised closed tickets with known resolutions, expanded with synthetic boundary and adversarial cases into the full versioned evaluation set. | Confirm or replace the provisional model before any pilot or production claim. This is the release decision. |
+| **Bootstrap, at the start of Milestone 6** | 12–20 authored cases covering the top ticket types — confirmed by ops where answered, otherwise the discovery hypotheses — including at least 4 unanswerable cases. | Choose a **provisional, reversible demo model**. The set is too small to support any quality claim beyond "suitable for a demo". |
+| **Confirmation, completed in Milestone 9** | The full versioned evaluation set of 60–100 authored cases, anchored by reproduced incidents, with a held-out split the prompt and retrieval were never tuned against. | Confirm or replace the provisional model. This is the release decision. |
 
 For each pass:
 
 1. Define the cases and quality bar before running candidates.
-2. Shortlist 3–4 open-weight instruction-tuned models across two size tiers — something in the 7–14B range and something in the 24–32B range.
+2. Shortlist 3–4 open-weight instruction-tuned models across two size tiers that fit the hardware the pass runs on. On the development machine that means roughly 3–4B and 7–8B at 4-bit; on a server GPU in Milestone 12, something in the 7–14B range and something in the 24–32B range.
 3. Run all of them against the same set, at temperature 0, with the same prompt and serving configuration. In the confirmation pass, also use the same constrained-decoding setup.
 4. Record for each: correctness on the available slices, abstention behaviour, tokens/second under one request and under eight concurrent requests, and VRAM footprint at the quantisation you will deploy. Add groundedness once the runbook corpus exists.
 5. Pick the smallest model that clears the stated bar. If none clears it, use the best bootstrap candidate only for the labelled demo and narrow the demo's claims.
 
-The bootstrap set is checked into `evals/bootstrap/` with provenance `synthetic`, its limitations, and ops sign-off. It must never be silently promoted into evidence of live-ticket performance. The post-demo ticket request remains deliberately post-demo; it no longer blocks the demo that earns permission for that request.
+The bootstrap set is checked into `evals/bootstrap/` with each case's provenance and its limitations recorded. Its cases may later join the Milestone 9 dev split, but never the held-out split: they were visible while the prompt was being built.
 
 Verify the current state of the open-weight field at the time you choose; it moves faster than any document. What is stable is the *method* above, and two rules of thumb: instruction-tuned beats base for this task, and a well-prompted smaller model with good retrieval usually beats a larger one with poor retrieval.
 
@@ -81,9 +81,52 @@ Verify the current state of the open-weight field at the time you choose; it mov
 
 **You also need an embedding model and probably a reranker**, both self-hosted, both chosen by the same method against retrieval metrics (recall@K, MRR) rather than by reputation. Embedding models are small and cheap to serve; this is not the expensive part.
 
-## The runbook corpus is a programme dependency
+## Data we create ourselves
 
-Milestone 8 cannot manufacture its source material during an engineering sprint. Discovery has not yet established whether usable written runbooks exist — ops has not been asked directly. As a deliberately conservative planning assumption, plan as though they do not: begin a parallel authoring workstream during discovery, nominate an operations owner, reserve a recurring review slot, and track 20–30 runbooks through draft, technical review, approval, and versioned publication. Milestone 8 starts only after that corpus-readiness gate is green. See [Discovery](02-discovery-with-operations.md) and [Milestone 8](milestone-08-rag.md).
+**Decision:** real customer tickets will not be released for this project, and we will not ask for them. Both the runbook corpus (Milestone 8) and the evaluation dataset (Milestones 6 and 9) are authored by us. This removes the two external data dependencies from the schedule. It also creates one serious risk that must be designed against from the first case.
+
+### The runbook corpus
+
+A runbook is a written procedure for diagnosing one known problem: symptoms, evidence to collect, diagnosis branches, safe next steps, and when to escalate. The corpus is the versioned collection of them. Milestone 8 retrieves from it, and Milestone 7's evidence check verifies that citations point into it.
+
+- **Written by us** from our own hosting experience, public technical knowledge, and — where it exists — the company's own public help content.
+- **Every runbook carries a review status:** `unreviewed` or `ops-reviewed`, with reviewer and date. Engineering proceeds on unreviewed runbooks. Ops review is an upgrade, not a prerequisite: asking "is this how we do it?" takes an engineer minutes, whereas asking them to author takes hours.
+- **The claim follows the status.** An answer citing an unreviewed runbook is grounded in *our* procedure, not in company policy, and the demo and reports must say so.
+- **Never model-generated.** An LLM may help with formatting, but diagnosis branches and safe next steps are written and checked by a person. A model-written runbook retrieved by a model is the model citing itself.
+
+### The evaluation dataset
+
+"Closed tickets with known resolutions" is replaced by **authored incident cases**, each tagged with one provenance:
+
+| Provenance | How it is made | What makes it trustworthy |
+|---|---|---|
+| `reproduced` — **the anchor** | Break a real stack on purpose — local PHP/WordPress, web server, database, mail — using a scripted fault: exhausted PHP memory, corrupt `.htaccess`, wrong permissions or ownership, full disk or inode quota, wrong database credentials, expired certificate, redirect loop. Capture the logs the fault actually produced. | **Ground truth is known by construction:** the root cause is the fault you injected, not someone's opinion. The logs are real output, in real formats, with real noise. Keep the fault script, so the case can be regenerated. |
+| `scenario` | A written case modelled on a real incident someone remembers — the symptom, the misleading clues, the eventual cause — with no customer details. | Captures the messy patterns nobody would think to reproduce. Weaker ground truth, so each one needs a second person to agree the reference answer. |
+| `adversarial` | Injection in the ticket or log, requests for another tenant's data, destructive-command bait, out-of-scope requests. | Tests safety behaviour rather than diagnosis. |
+| `unanswerable` | A plausible incident no runbook covers, or whose logs do not contain the cause. | The correct answer is abstention; tests the most dangerous failure an ops assistant has. |
+
+### The risk: grading your own homework
+
+When the same people write the runbooks, the test cases, and the reference answers, an evaluation can quietly measure *how well the system repeats our own wording back to us*. Retrieval scores look excellent because the question uses the runbook's vocabulary; answers look correct because the reference answer was copied from the runbook. None of it predicts behaviour on a real customer's ticket. These rules are mandatory, not advice:
+
+1. **Ground truth never comes from the runbook text.** For `reproduced` cases it is the injected fault. For `scenario` cases it is written before looking at the matching runbook section.
+2. **Tickets are written in the customer's voice, not the runbook's.** "My shop is broken since this morning, nothing loads" — not "HTTP 500 due to PHP memory limit exhaustion". A case whose ticket text shares distinctive phrases with its target runbook is rewritten. Check this mechanically with a vocabulary-overlap score per case, and report retrieval results for high- and low-overlap cases separately.
+3. **A held-out split exists from day one and is never used for tuning.** At least 30% of cases, frozen before prompt and chunking experiments begin, and run only at confirmation. Tuning against it once turns it into a dev set; if that happens, write new held-out cases.
+4. **Separate authorship where possible.** If a second person is available — a colleague, a support engineer contributing scenarios — their cases go into the held-out split. Record the author of every case and every runbook, and report results by author.
+5. **Some answers must be missing from the corpus.** At least 15 unanswerable cases in the Milestone 9 set. If everything the tests ask is in the runbooks, abstention is never tested.
+6. **Label every result with its provenance.** Reports state counts per provenance and per author, and never describe authored-case accuracy as real-ticket accuracy.
+
+### What we can and cannot claim
+
+| We can say | We cannot say |
+|---|---|
+| "Correct root cause on N of M reproduced incidents across these categories" | "X% accurate on customer tickets" |
+| "Retrieval recall@5 of Y on low-overlap, customer-voice queries" | "Works on our support queue" |
+| "Abstained correctly on K of 15 unanswerable cases" | "Reduces escalations" — without an in-company pilot |
+
+The only route to the right-hand column is measurement inside the company boundary: support engineers using the tool on live tickets and rating answers, with only the aggregate ratings leaving their workflow. That is a pilot decision for later, and it is a different — and much easier — approval than releasing tickets.
+
+**Why this is not a weaker position.** "I built the evaluation set by reproducing real hosting failures, so every case has a known root cause, and I kept a held-out split written in the customer's voice" is a stronger interview answer than "my employer gave me twenty tickets". Real tickets frequently have unclear or wrong resolutions; reproduced incidents never do.
 
 ## Serving
 
@@ -95,15 +138,21 @@ Milestone 8 cannot manufacture its source material during an engineering sprint.
 
 A pragmatic split: develop *features* against the easy local option, and target the high-throughput server for anything the ops team will actually use. The provider port makes this a configuration change, which is the entire reason the port exists.
 
-**What a laptop cannot give you is a capacity number.** Prompt construction, validation, retries, the state machine, and retrieval can all be built and tested against a local server or the fake adapter. But the concurrency knee, KV-cache pressure, tokens/s, and VRAM footprint are properties of one specific combination of GPU, model, quantisation, and serving stack. A limit measured on a laptop running llama.cpp says nothing about a GPU host running vLLM. Therefore:
+**Development hardware.** OpsPilot is developed on a local machine with an integrated AMD Radeon 680M GPU sharing 30 GB of system RAM. That means:
 
-- **GPU access is a gate, not an assumption.** Milestone 6's capacity exercises (the concurrency curve and bootstrap model selection) require access to target-class hardware — the GPU type and serving stack you expect to deploy on. Track this as an early workstream in the [README](README.md); ask for it during discovery, because hardware allocation has a longer lead time than code.
-- **Every capacity limit is tagged with the configuration that produced it.** ADR-007 records the in-flight limit, queue depth, and queue-wait bound together with the GPU model, VRAM, model revision, quantisation, serving stack and version, and maximum context length.
-- **Any change to that configuration invalidates the limits.** Re-run the Milestone 6 concurrency curve and re-derive the Milestone 7 bulkhead whenever any tagged component changes — including the move from a development GPU to production hardware in Milestone 12. A limit whose configuration no longer matches the deployment is treated as unknown, not as approximately right.
+- **Serving stack for development: llama.cpp with its Vulkan backend.** vLLM targets discrete GPUs and does not support this chip. llama.cpp also supports JSON-schema and grammar-constrained decoding, so Milestone 7 works unchanged.
+- **Models for development:** 3–4B for fast iteration; 7–8B at 4-bit quantisation for quality checks. Larger models are impractical here.
+- **Concurrency is effectively one request at a time**, and long log excerpts are slow to process. Measure it; do not assume.
+- Everything in Milestones 6–11 can be built and learned on this machine.
 
-If target-class hardware is not yet available when Milestone 6 starts, build the milestone's software against the local server, mark the capacity exercises and the provisional model selection as **blocked**, and escalate the hardware request. Do not substitute laptop numbers.
+**Capacity numbers are only valid for the configuration that produced them.** The concurrency knee, KV-cache pressure, tokens/s, and memory footprint are properties of one specific combination of GPU, model, quantisation, and serving stack. Measuring them on the development machine is worthwhile — the shape of the curve and the way latency collapses past the knee teach the concept on any hardware — but the numbers never transfer to other hardware. Therefore:
 
-**Hardware, in the range this project needs:** a quantised model in the 7–14B class fits comfortably on a single 24 GB GPU and will serve an internal support tool with modest concurrency. The 24–32B class needs more, or heavier quantisation, or both. CPU-only inference works for development and is too slow for interactive use. Before promising anything, ask what hardware actually exists and who controls it — see the open questions below.
+- **Every capacity limit is tagged with the configuration that produced it.** ADR-007 records the in-flight limit, queue depth, and queue-wait bound together with the GPU model, memory, model revision, quantisation, serving stack and version, and maximum context length. Development numbers are tagged as such.
+- **Any change to that configuration invalidates the limits.** Re-run the Milestone 6 concurrency curve and re-derive the Milestone 7 bulkhead whenever any tagged component changes — including the move to production hardware in Milestone 12. A limit whose configuration no longer matches the deployment is treated as unknown, not as approximately right.
+- **Model selection on the development machine is also provisional in size.** A model that fits a 680M may not be the one worth deploying on a server GPU. Milestone 12 re-runs the confirmation pass on the production hardware and may choose a larger model.
+- **Server GPUs are needed only for the company deployment in Milestone 12.** That is a prerequisite for that milestone, not for development.
+
+**Production hardware, in the range this project needs:** a quantised model in the 7–14B class fits comfortably on a single 24 GB GPU and will serve an internal support tool with modest concurrency. The 24–32B class needs more, or heavier quantisation, or both. CPU-only inference works for development and is too slow for interactive use. Before promising anything, ask what hardware actually exists and who controls it — see the open questions below. The full sizing estimate, the rest of what self-hosting requires, and how to measure it cheaply are in [GPU sizing and cost](03-gpu-sizing-and-cost.md).
 
 ## Capacity: the ceiling moves, it does not disappear
 
@@ -149,7 +198,7 @@ Route these to the ops/technology channel, and route the hardware one through yo
 2. **What GPU hardware exists today, who owns it, and what would it take to get access** to a modest allocation for an internal tool?
 3. **Is there an existing internal model deployment** anyone is already running? If so, the fastest correct move is to consume it rather than stand up a second one.
 4. **Who signs off on the model choice** — is there an approved-software process, and does an open-weight model with a permissive licence pass it? Check the licence terms for commercial use before you get attached to a model.
-5. **Does the constraint extend to the runbook corpus**, or only to customer log data? Runbooks are company IP but not customer data, and the distinction may matter.
+5. **Does the constraint extend to the runbook corpus**, or only to customer log data? Our runbooks are self-authored, but once ops reviews them they describe company procedure, and the distinction may matter.
 
 ## What would change this decision
 

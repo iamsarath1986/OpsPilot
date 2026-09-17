@@ -9,6 +9,7 @@ One product, built in twelve milestones. Written to be *done*, not just read.
 | [00-what-you-are-building.md](00-what-you-are-building.md) | The project in plain language: the problem, an example request and response, who uses it, how it grows |
 | [01-the-binding-constraint.md](01-the-binding-constraint.md) | ADR-000: customer data stays on company infrastructure; inference, embeddings, reranking, and judging are self-hosted |
 | [02-discovery-with-operations.md](02-discovery-with-operations.md) | Questions for the operations team, shared-hosting pain points, and what ops has told us so far |
+| [03-gpu-sizing-and-cost.md](03-gpu-sizing-and-cost.md) | How much GPU production needs (estimate: 1 to run, 2 for redundancy), what else self-hosting requires, and a ~$15 rented-GPU test that replaces the estimate with measurements |
 
 ## The milestones
 
@@ -35,16 +36,19 @@ The numbered milestones describe the engineering sequence; they are not the sche
 
 | Workstream | Start | Gate it must clear |
 |---|---|---|
-| Runbook corpus | Discovery, in parallel with Milestones 1–7 | 20–30 reviewed, versioned runbooks before Milestone 8 implementation begins |
-| GPU access | Discovery; request it well before Milestone 6 | Access to target-class hardware (the GPU type and serving stack you expect to deploy on) before Milestone 6's concurrency curve and model selection. Without it those exercises are blocked — laptop numbers are not a substitute |
-| Provisional model selection | Start of Milestone 6, on target-class hardware | 12–20 synthetic, ops-reviewed cases are enough to choose a reversible demo model |
-| Synthetic-data demo | Final week of Milestone 7 (Step 8) | Ops has seen validated, degraded, and abstained results on synthetic data, with no real-ticket quality claimed |
-| Closed-ticket request | Same week as the demo, through your manager | Approved sanitised closed tickets arrive in time for labelling at the start of Milestone 9 |
-| Production model confirmation | Milestone 9, Step 6 | Approved tickets plus synthetic/adversarial cases support the full evaluation pass |
+| Runbook corpus (we write it) | Now, in parallel with Milestones 1–7 | 20–30 runbooks written to the template, versioned, review status recorded, before Milestone 8 implementation begins. Ops review is optional |
+| Evaluation cases (we build them) | Now: fault scripts and reproduced incidents alongside Milestones 1–5 | 12–20 cases by Milestone 6; 60–100 with a frozen held-out split by Milestone 9 |
+| Provisional model selection | Start of Milestone 6, on the development machine | 12–20 authored cases are enough to choose a reversible demo model |
+| Demo for operations | Final week of Milestone 7 (Step 8) | Ops has seen validated, degraded, and abstained results, and has reviewed a sample of runbooks and scenarios |
+| Model confirmation | Milestone 9, Step 6; repeated on server hardware in Milestone 12 | The full authored set, including the held-out split, clears the bars recorded before the run |
+| GPU sizing measurement | After Milestone 11's load test exists; before any hardware request | A few hours on a rented L4/L40S with synthetic data only fills the measured results table in [GPU sizing and cost](03-gpu-sizing-and-cost.md) |
+| Server GPU access | Only when the company deployment becomes a real plan | Needed for Milestone 12's company target, not for development. Request hardware from measured numbers, not from the estimate |
 
-Capacity limits are measured, not carried: whenever the GPU, model revision, quantisation, serving stack, or context length changes, the Milestone 6 concurrency curve is re-run and the Milestone 7 limits re-derived.
+**No step depends on real customer tickets.** Both the runbooks and the evaluation cases are authored by us — see [Data we create ourselves](01-the-binding-constraint.md#data-we-create-ourselves), including the rules that stop the evaluation from grading its own homework.
 
-The 5–6 weeks shown for Milestone 8 are engineering time for ingestion and retrieval. They do **not** include waiting for operations staff to author and approve the source material.
+**Development runs on a local machine with an integrated GPU**, using llama.cpp. Capacity limits are measured, not carried: whenever the GPU, model revision, quantisation, serving stack, or context length changes, the Milestone 6 concurrency curve is re-run and the Milestone 7 limits re-derived.
+
+The 5–6 weeks shown for Milestone 8 are engineering time for ingestion and retrieval. They do **not** include writing the runbooks.
 
 ## How every milestone is structured
 

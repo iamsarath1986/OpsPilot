@@ -155,17 +155,17 @@ If none fits the deadline and capacity budget, remove the fallback-model rung an
 
 Immutable, versioned prompt artifacts in `prompts/`, with a changelog. The version is stored with every diagnosis. Requirement to test: given a stored diagnosis row, you can reconstruct exactly which prompt, model, and settings produced it.
 
-### Step 8 — The synthetic-data demo, and the ticket request
+### Step 8 — The demo for operations
 
 This is the demo the rest of the roadmap refers to. Schedule it for the final week of this milestone, once Steps 1–7 are working — not before. A Milestone 6 demo shows answers that are sometimes malformed; this one shows a system that validates, degrades honestly, and abstains when it should, and that is what earns trust.
 
 - **Audience:** the operations manager and one or two first-level support engineers. 30 minutes.
-- **Content:** only the ops-reviewed synthetic bootstrap set. Show one `complete` diagnosis with cited evidence, one `degraded` result with its reason and source, one honest `abstained` case, and the rejection of a fabricated citation. Show the rule-baseline comparison from Milestone 6, including where rules still win.
-- **Claims:** state explicitly that quality on real tickets is not yet measured, and that measuring it is the purpose of the request that follows. Do not demo a live model call on customer data.
-- **The ask, in the same week:** send the request for roughly 20 approved, sanitised closed tickets with known resolutions through your manager, citing the demo. Labelling takes calendar time; Milestone 9 depends on it, so the request must leave now, not when Milestone 9 starts.
-- **Record:** the date, attendees, feedback, and the status of the ticket request in `02-discovery-with-operations.md`.
+- **Content:** only authored cases — preferably reproduced incidents, whose root cause is known. Show one `complete` diagnosis with cited evidence, one `degraded` result with its reason and source, one honest `abstained` case, and the rejection of a fabricated citation. Show the rule-baseline comparison from Milestone 6, including where rules still win.
+- **Claims:** state explicitly that results come from cases we authored and reproduced, not from real tickets, and that runbooks marked `unreviewed` describe our procedure, not company policy. Do not demo a live model call on customer data.
+- **The ask: review, not data.** Ask ops to check three or four of our runbooks ("is this how we handle it?"), to sanity-check a few `scenario` cases, to describe from memory a couple of recent cases that could become new scenarios, and to say which ticket categories matter most. Each costs minutes and involves no customer data.
+- **Record:** the date, attendees, feedback, and which runbooks and scenarios were reviewed, in `02-discovery-with-operations.md`. Update the review status of each reviewed runbook.
 
-If the demo cannot be scheduled, or the ticket request is refused or stalls, Milestone 8 can proceed but Milestone 9's production-model confirmation cannot. Escalate that as a schedule risk rather than substituting more synthetic cases.
+Nothing later in the roadmap depends on this demo happening. If it cannot be scheduled, Milestones 8 and 9 proceed on unreviewed runbooks and authored cases, and the reports say so.
 
 ## 5. Expected Project State
 
@@ -224,14 +224,14 @@ If the demo cannot be scheduled, or the ticket request is refused or stalls, Mil
 - [ ] I tripped a circuit breaker and observed half-open recovery.
 - [ ] Every request ends in exactly one of four outcome states; every result has an `output_source`, every degraded result has a typed reason, and only the permitted state/source/reason combinations can be constructed.
 - [ ] Queue timeout and GPU OOM never retry; context overflow takes one bounded repair rather than an unchanged replay.
-- [ ] My global bulkhead and queue bounds come from M6's concurrency curve measured on target-class hardware, are tagged with the configuration that produced them, and startup fails if that tag does not match the running inference server.
+- [ ] My global bulkhead and queue bounds come from M6's measured concurrency curve, are tagged with the configuration that produced them, and startup fails if that tag does not match the running inference server.
 - [ ] My cache key includes tenant, prompt, model revision, quantisation, decoding/schema configuration, and corpus/retrieval versions — with omission tests.
 - [ ] Per-tenant limits work and return correct `429` with `Retry-After`.
 - [ ] Given a stored diagnosis, I can reconstruct the exact prompt, model revision, quantisation, decoding/schema configuration, and generation settings that produced it.
 - [ ] I compared four fallback strategies on quality, latency, and inference capacity with real numbers.
 - [ ] The fallback-model rung has an explicit residency choice, measured load latency and VRAM, and a re-measured primary bulkhead; if it does not fit, the rung is removed.
 - [ ] I have written one SLI and SLO for the diagnosis path and measured current performance against it.
-- [ ] I ran the synthetic-data demo for operations, made no claim about real-ticket quality, and sent the closed-ticket request through my manager the same week.
+- [ ] I ran the demo for operations on authored cases, stated what the results can and cannot claim, and recorded which runbooks and scenarios ops reviewed.
 - [ ] **ADR-007** records the reliability policy, the degradation ladder, and the capacity limits with their configuration tag.
 
 ---

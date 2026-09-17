@@ -6,11 +6,11 @@
 
 **Why after reliability, not before:** retrieval adds a second failure surface. Debugging "was that the retrieval or the model?" is only tractable when the model path is already validated and observable.
 
-**Time:** 5–6 focused engineering weeks; corpus authoring is a separate calendar-bound workstream that began during discovery. **Prerequisites:** Milestone 7 checklist green, and the corpus-readiness gate below green.
+**Time:** 5–6 focused engineering weeks; writing the runbooks is a separate workstream that began early and is not included. **Prerequisites:** Milestone 7 checklist green, and the corpus-readiness gate below green.
 
 ### Corpus-readiness gate
 
-Do not start the ingestion implementation while source material is still hypothetical. Operations must have approved 20–30 versioned runbooks with named owners and review dates, covering enough of the prioritised ticket categories to label at least 40 retrieval questions. If this gate is red, continue infrastructure-independent learning exercises and escalate the schedule risk; do not fill the gap with model-generated operational policy.
+Do not start the ingestion implementation while source material is still hypothetical. 20–30 runbooks must be written to the template, versioned, with author and review status recorded, covering enough of the prioritised ticket categories to label at least 40 retrieval questions. Ops review is **not** required: unreviewed runbooks are a limit on what answers may claim, not on engineering. If this gate is red, finish writing before building; do not fill the gap with model-generated operational policy (see [Data we create ourselves](01-the-binding-constraint.md#data-we-create-ourselves)).
 
 ---
 
@@ -20,7 +20,7 @@ Do not start the ingestion implementation while source material is still hypothe
 |---|---|
 | Why RAG at all: grounding, freshness, access control, cost | Compared with fine-tuning: RAG updates in seconds, cites sources, and respects per-tenant permissions. Fine-tuning does none of those. |
 | RAG versus long-context prompting | If you can fit everything in the context window, do you need retrieval? Sometimes not — and knowing when is a real design judgement about cost, latency, and precision. |
-| Document loading and normalisation | Runbooks arrive as Markdown, wiki exports, PDFs, and closed tickets. Garbage in, garbage retrieved. |
+| Document loading and normalisation | Runbooks arrive as Markdown, wiki exports, PDFs, and help-centre pages. Garbage in, garbage retrieved. |
 | Chunking strategies: fixed, recursive, structural, semantic | A chunk is the unit of retrieval. Split a five-step fix across two chunks and you retrieve half a procedure. |
 | Chunk overlap | Recovers context lost at boundaries — at the cost of duplication and storage. |
 | Embeddings and vector space | What "semantic similarity" actually measures, and why it is not the same as relevance. |
@@ -51,7 +51,7 @@ Do not start the ingestion implementation while source material is still hypothe
 
 ## 3. Hands-On Learning Exercises
 
-Build a small labelled set first: 40 ops-authored or ops-approved support questions, each with the runbook chunk IDs that *should* be retrieved. These may be synthetic scenarios; label their provenance honestly. Everything below depends on it.
+Build a small labelled set first: 40 support questions, each with the runbook chunk IDs that *should* be retrieved. Write the questions **in the customer's voice** and, where possible, before rereading the target runbook; record each question's provenance and author. Compute a vocabulary-overlap score between each question and its target chunk, and report every metric below separately for high- and low-overlap questions — a retriever that only succeeds when the question repeats the runbook's wording has not learned anything useful. Everything below depends on this set.
 
 1. **Chunk sweep.** Sizes 200 / 500 / 1000 tokens × overlap 0% / 10% / 25%. Measure recall@5 for each of the nine combinations. Pick from the table. Keep the table — it is one of the most persuasive artifacts you will produce.
 2. **Embedding comparison.** Two self-hosted models on the same corpus and queries. Compare recall@5, index size, embedding time, memory demand, and query latency. Note that the better model is not automatically the right one.
@@ -66,9 +66,9 @@ Build a small labelled set first: 40 ops-authored or ops-approved support questi
 
 ### Step 1 — Accept and freeze the first corpus release
 
-Import the 20–30 runbooks authored with ops since discovery: 500 error after deploy, permission problems, disk and inode quota, mail delivery failures, SSL renewal, database connection limits, compromised WordPress, outbound spam, DNS propagation, slow site triage. Verify owner, approval, version, review date, and absence of customer data; freeze the release used by the retrieval experiments.
+Import the 20–30 runbooks we have written since the start of the project: 500 error after deploy, permission problems, disk and inode quota, mail delivery failures, SSL renewal, database connection limits, compromised WordPress, outbound spam, DNS propagation, slow site triage. Verify author, review status, version, and absence of customer data; freeze the release used by the retrieval experiments.
 
-Corpus authoring is genuinely useful to your employer independent of the software, but it is not part of the 5–6-week engineering estimate. Continue the recurring ops review cadence so corrections become new corpus versions. Clear headings in the authoring template become chunk boundaries here.
+The runbooks are genuinely useful to your employer independent of the software, and a reviewed corpus is worth offering to ops on its own. Writing them is not part of the 5–6-week engineering estimate. Whenever ops reviews or corrects a runbook, publish a new corpus version. Clear headings in the authoring template become chunk boundaries here.
 
 ### Step 2 — Ingestion pipeline
 

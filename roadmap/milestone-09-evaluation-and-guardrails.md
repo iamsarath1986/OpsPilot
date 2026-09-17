@@ -4,7 +4,7 @@
 
 **Why now:** you have three things that all affect quality (prompt, retrieval, model) and no way to tell which change helped. Every future improvement is guesswork until this exists. This milestone is also the one most explicitly named in modern AI job descriptions.
 
-**Time:** 5–6 focused weeks. **Prerequisites:** Milestone 8 checklist green with the retrieval harness working; the closed-ticket request sent after the [Milestone 7 demo](milestone-07-reliable-ai-orchestration.md) (Step 8) has been approved and the sanitised tickets have arrived, so labelling can start now. If they have not, build the harness, graders, and gate against the synthetic set, but treat Step 6 (production-model confirmation) as blocked.
+**Time:** 5–6 focused weeks. **Prerequisites:** Milestone 8 checklist green with the retrieval harness working; at least 40 authored incident cases already exist, including a frozen held-out split, so this milestone extends the dataset rather than starting it. No real tickets are used — see [Data we create ourselves](01-the-binding-constraint.md#data-we-create-ourselves).
 
 ---
 
@@ -50,7 +50,7 @@
 
 ## 3. Hands-On Learning Exercises
 
-1. **Build the dataset.** Turn roughly 20 approved sanitised closed tickets with known resolutions into operational anchor cases, then add synthetic boundary, variation, and adversarial cases to reach 60–100 total. Each has: stable ID, provenance, input, corpus version, expected retrieved chunks, reference facts, forbidden claims, whether it is answerable at all, slice tags, and risk level. **Include 15 unanswerable cases** — where correct behaviour is abstention. Keep the M6 bootstrap cases identified as synthetic; they do not become operational evidence by repetition.
+1. **Build the dataset.** 60–100 authored cases. Anchor it with `reproduced` incidents — a scripted fault from `evals/faults/`, the logs it really produced, and the injected fault as ground truth — then add `scenario`, `adversarial`, and `unanswerable` cases. Each has: stable ID, provenance, author, input written in the customer's voice, corpus version, expected retrieved chunks, reference facts, forbidden claims, whether it is answerable at all, slice tags, and risk level. **Include 15 unanswerable cases** — where correct behaviour is abstention. Follow the six rules in [ADR-000](01-the-binding-constraint.md#the-risk-grading-your-own-homework): ground truth never copied from runbook text, a held-out split of at least 30% frozen before tuning, and the M6 bootstrap cases kept out of the held-out split.
 2. **Measure your noise floor.** Run the same eval three times without changing anything. Record the spread. Any future improvement smaller than this is not an improvement.
 3. **Calibrate the judge.** Score 30 answers yourself. Have the judge score the same 30. Compute agreement. Read every disagreement — you will usually find your *rubric* is ambiguous, not the judge.
 4. **Prove position bias.** Run pairwise comparisons, then run them again with the options swapped. If the winner changes, you have measured a bias that would otherwise have silently driven your decisions.
@@ -59,6 +59,7 @@
 7. **Abstention curve.** Sweep the confidence and relevance thresholds. Plot abstention rate against wrong-answer rate. Choose a point deliberately and write down the reasoning — this is a product decision with a safety dimension, and it should be documented as one.
 8. **Self-consistency.** Sample the same question three times; measure whether disagreement between samples predicts wrongness. Then decide whether the tripled cost is worth it. Usually it is not — but now you know rather than assume.
 9. **Valid-but-degraded regression.** Disable constrained decoding so the unconstrained fallback still returns valid answers. Confirm ordinary answer graders pass, then prove the release gate fails on the new `decoder_constraint_unavailable` reason rate. Repeat with a forced capacity fallback and confirm the report distinguishes its source and reason.
+10. **Grade your own homework, deliberately.** Take ten cases and rewrite their ticket text using the target runbook's exact wording. Run retrieval and answer grading on both versions. The gap between the runbook-voice and customer-voice scores is how much an evaluation written by the corpus authors would have flattered the system — and the reason the rules exist.
 
 ## 4. Project Implementation
 
@@ -168,7 +169,8 @@ Re-run the candidate comparison from ADR-000 on the full versioned dataset, usin
 ## 9. Milestone Completion Checklist
 
 - [ ] My dataset has documented slices, adversarial cases, and unanswerable cases, with provenance for each.
-- [ ] Approved closed tickets anchor the operational slices; synthetic cases remain visibly labelled and are not presented as live-ticket evidence.
+- [ ] Reproduced incidents anchor the dataset; every case records provenance and author; the held-out split was frozen before tuning; and no report describes authored-case results as real-ticket accuracy.
+- [ ] I measured the runbook-voice versus customer-voice gap, and my headline numbers come from customer-voice cases.
 - [ ] I know my noise floor and refuse to act on differences smaller than it.
 - [ ] I calibrated my judge against my own labels and can state the agreement level.
 - [ ] The standing `egress-policy` CI job proves evaluation cases and judge payloads can reach only the approved self-hosted endpoint.
@@ -182,7 +184,7 @@ Re-run the candidate comparison from ADR-000 on the full versioned dataset, usin
 - [ ] An escalation packet contains everything a human needs, verified by an actual human.
 - [ ] Guardrail trips and abstentions are counted metrics, not silent branches.
 - [ ] I can explain how a production failure becomes a permanent regression case.
-- [ ] I confirmed or replaced the provisional M6 model using the full evaluation set and deployable quantisation.
+- [ ] I confirmed or replaced the provisional M6 model using the full authored evaluation set, including the held-out split, and deployable quantisation.
 - [ ] **ADR-009** records the evaluation strategy, grading hierarchy, and gate policy.
 
 ---

@@ -84,6 +84,8 @@ Then four alerts, each with a runbook: elevated user-facing error rate; p95 late
 
 k6 or Locust scripts for the three main paths. Report format: environment, traffic model, arrival rates, p50/p95/p99, error rate, the saturating resource, and what you changed. Record the self-hosted inference ceiling: concurrent sequences, KV-cache pressure, tokens/s, queue growth, and the arrival rate at which latency collapses. Milestone 12 uses those measurements for admission control and maximum replica counts.
 
+Once these scripts work locally, run them on a rented L4 and L40S for an afternoon (about $15, synthetic data only) as described in [GPU sizing and cost](03-gpu-sizing-and-cost.md#8-replace-the-estimate-rent-a-gpu-for-an-afternoon), and fill in its measured results table. The development machine's integrated GPU cannot tell you what a server GPU will do; this is the cheapest way to find out before anyone buys hardware.
+
 ### Step 4 — Containers
 
 Multi-stage Dockerfiles for API and worker: build stage with toolchain, runtime stage slim and non-root, no secrets in layers, `.dockerignore` covering `.env`, `.git`, and tests. Health-check endpoints wired to the platform's probes. Graceful shutdown handling `SIGTERM`: stop accepting, drain in-flight work, close pools, exit. For workers, that means finishing or safely abandoning the current message so it is redelivered rather than lost.

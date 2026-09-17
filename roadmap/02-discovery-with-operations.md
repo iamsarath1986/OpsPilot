@@ -103,24 +103,32 @@ Use in a conversation, not an email. Aim to cover sections 1–5; the rest can f
 ### 9. The pilot
 - Could we trial it on one ticket category for two weeks?
 - Who on the team would be willing to give feedback on the answers?
-- Can I have roughly 20 closed tickets with their eventual resolutions, anonymised, to test against?
+- Could you describe, from memory and without customer details, a few cases you solved recently — the symptom, what misled you, and the actual cause? (These become `scenario` evaluation cases. Nothing is exported.)
+- Roughly what share of technical tickets falls into each category? (Numbers only. They weight the evaluation slices by real frequency.)
 
-**That last question matters more than it looks.** Those closed tickets with known resolutions are your evaluation dataset (Milestone 9). Without them, you can only claim the answers look plausible. With them, you can measure how often the system is right, how often it correctly says "I don't know", and whether a change made things better or worse.
+**Do not ask for real tickets or log samples.** They will not be released, and the project does not need them: the evaluation dataset and the runbook corpus are both authored by us — see [Data we create ourselves](01-the-binding-constraint.md#data-we-create-ourselves) in ADR-000. What ops can usefully contribute costs them minutes and involves no customer data: remembered scenarios, the ticket mix as percentages, and reviews of runbooks we have written.
 
-Ask for those tickets after the first synthetic-data demo, as planned. They are **not** required to choose the provisional demo model: the bootstrap selection in [ADR-000](01-the-binding-constraint.md) uses 12–20 synthetic, ops-reviewed cases. The approved tickets are required to confirm or replace that model before a pilot or production claim.
+## Workstream: write the runbook corpus ourselves, starting now
 
-## Parallel workstream: author the runbook corpus now
+Written runbooks may or may not exist internally; it does not matter for the schedule, because we author our own. If ops later shares existing material, it improves the corpus rather than unblocking it. Start early anyway: 20–30 careful runbooks take calendar time, and Milestone 8 needs them.
 
-Discovery has not yet established whether a usable written runbook corpus exists; the ops reply described the support workflow but said nothing about documentation. As a deliberately conservative planning assumption, treat operational knowledge as tribal until ops confirms otherwise — assuming a corpus that turns out not to exist costs months, while starting authoring that turns out to be partly unnecessary costs weeks. Do not wait for Milestone 8.
+1. Prioritise by ticket volume × repetitiveness × risk. Begin with the categories behind the Milestone 1 deterministic rules, then the rest of the top ticket types.
+2. Use one template: scope, symptoms, evidence to collect, diagnosis branches, safe next steps, escalation conditions, author, review status, version, and source references.
+3. Track each runbook through `drafted → unreviewed → ops-reviewed (optional) → versioned`. Record author, reviewer, and review date.
+4. Write diagnosis branches and safe steps yourself. A model may help with formatting only — a model-written runbook retrieved by a model is the model citing itself.
+5. Keep customer data out entirely. Examples are synthetic or come from reproduced incidents.
+6. Offer ops the review, not the writing: "is this how we handle it?" takes minutes. It fits the training-questions channel they already opened.
 
-1. Ask the operations manager to name one corpus owner and 2–3 reviewers.
-2. Reserve a recurring 45-minute authoring/review session from Milestone 1 onward.
-3. Prioritise 20–30 runbooks by ticket volume × repetitiveness × risk; begin with the top five categories used by the deterministic baseline.
-4. Use one template: scope, symptoms, evidence to collect, diagnosis branches, safe next steps, escalation conditions, owner, review date, and source references.
-5. Track each runbook through `identified → drafted → technical review → approved → versioned`, including reviewer and next-review date.
-6. Keep customer data out of drafts. Examples are synthetic unless the approved data-handling process says otherwise.
+The corpus-readiness gate for Milestone 8 is: 20–30 runbooks written to the template, versioned, with review status recorded, and broad enough to support at least 40 labelled retrieval questions. Ops review is **not** required to pass the gate; it changes what the answers may claim, not whether engineering can proceed.
 
-This is the roadmap's current **longest pole and critical-path risk**. The corpus-readiness gate for Milestone 8 is: 20–30 runbooks approved by ops, stored in a versioned source location, owned, dated, and broad enough to support at least 40 labelled retrieval questions. Escalate missed reviews as a schedule risk; adding engineers does not remove this dependency.
+## Workstream: build the evaluation cases ourselves
+
+Evaluation cases are written in parallel with, but independently from, the runbooks. Follow the six rules in [ADR-000](01-the-binding-constraint.md#the-risk-grading-your-own-homework) from the first case. The most important habits:
+
+- **Reproduce before you write.** Script a fault on a local stack, capture the logs it really produces, and record the injected fault as the ground truth.
+- **Write the ticket text as a customer would**, never in runbook vocabulary.
+- **Freeze a held-out split early** and do not look at its results while tuning.
+- **Keep a fault library** in the repository (`evals/faults/`): one script per failure, so every reproduced case can be regenerated after a stack or log-format change.
 
 ## Running the conversation
 
@@ -164,17 +172,15 @@ First contact was a short written question about how a "500 Internal Server Erro
 
 1. First-level resolution rate, and what actually triggers escalation — access, knowledge, or authority.
 2. Repeat-cause distribution: is there a top five? (Milestone 1 rules, Milestone 9 eval slices.)
-3. Whether written runbooks exist or knowledge is tribal. This sizes Milestone 8 — retrieve an existing corpus, or author one with the team.
+3. Whether written runbooks exist internally. No longer blocking — we author our own corpus — but existing material would improve it.
 4. The precise scope of the confirmed data boundary: what counts as company infrastructure, and whether runbook IP is covered as well as customer logs. ADR-000 already blocks hosted inference; these details refine Milestones 5, 8, and 12 without reopening that decision.
 5. Whether any diagnostic tooling exists that the reply did not mention.
 6. Cost of a confidently wrong suggestion. Sets the abstention policy.
 
 **The channel that opened.** Operations offered to fold questions into an onboarding training they are building, and asked for more. This is a better channel than a meeting request: written, invited, and answered by the people who own the workflow. Open questions 1–4 go back through it, framed as training topics rather than requirements gathering.
 
-**Deliberately not yet asked:** real tickets or log samples. That is a data-protection conversation, it goes through the manager, and it belongs after someone has seen a demo — not bundled into a training request, where it would make an easy ask look like a hard one.
+**Decided: no real tickets.** Real tickets and log samples will not be released, and we will not ask for them. The runbook corpus and the evaluation dataset are both authored by us ([ADR-000](01-the-binding-constraint.md#data-we-create-ourselves)). The consequence is a limit on claims, not a blocker: results describe authored and reproduced cases, never real-ticket accuracy.
 
-**Start now despite that deferral:** request a corpus owner and recurring runbook-review time. This asks ops to document its own approved procedures, not to release customer tickets or logs, so it can proceed before the demo.
+**Hardware: resolved for development.** OpsPilot is developed on a local machine with an integrated GPU, using llama.cpp. Server GPUs are needed only for the company deployment in Milestone 12; ask what hardware exists and who owns it when that deployment becomes a real plan, not before.
 
-**Also start now: GPU access.** Ask, through your manager, what GPU hardware exists, who owns it, and whether a modest allocation of target-class hardware can be made available before Milestone 6. No customer data is involved, and hardware allocation usually has a longer lead time than the code that needs it. Milestone 6's capacity measurements and model selection are blocked without it.
-
-**Scheduled, not ad hoc: the demo and the ticket request.** The synthetic-data demo is Step 8 of [Milestone 7](milestone-07-reliable-ai-orchestration.md), and the closed-ticket request goes through your manager the same week. Record the date, attendees, feedback, and request status here.
+**Scheduled, not ad hoc: the demo.** The demo is Step 8 of [Milestone 7](milestone-07-reliable-ai-orchestration.md). Its ask is review, not data: ops checks a handful of our runbooks and scenarios, and says which ticket categories matter most. Record the date, attendees, and feedback here.

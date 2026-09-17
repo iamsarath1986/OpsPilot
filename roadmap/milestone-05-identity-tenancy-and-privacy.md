@@ -86,7 +86,7 @@ Start with `tenant_id` on every table plus enforcement in the repository layer. 
 
 **After:** every request is authenticated; every data access is tenant-scoped at a chokepoint and role-checked; uploads are bounded and sanitised; log content is redacted before storage; sensitive actions are audited; and there is a written threat model with a known residual-risk list.
 
-**Architecturally:** OpsPilot is now safe enough to hold approved customer data — which is the precondition for the ops team giving you sanitised real tickets, and for Milestone 6 sending redacted content to the self-hosted inference service without widening internal access unnecessarily.
+**Architecturally:** OpsPilot is now safe enough to hold approved customer data — which is the precondition for any later in-company pilot on live tickets, and for Milestone 6 sending redacted content to the self-hosted inference service without widening internal access unnecessarily.
 
 ## 6. Testing and Validation
 

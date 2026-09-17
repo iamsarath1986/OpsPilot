@@ -6,7 +6,7 @@
 
 **Why Azure:** the job description names it. The Azure target is real, deployed, and operated, but it is not authorised for customer data under ADR-000. The concepts transfer to any major cloud, and you should be able to state the AWS or GCP equivalent of each service you use.
 
-**Time:** 6–8 focused weeks. **Prerequisites:** Milestone 11 checklist green; ADR-012 records both targets and their data boundary; company infrastructure and GPU ownership are named. **Set an Azure budget alert before you provision anything.**
+**Time:** 6–8 focused weeks. **Prerequisites:** Milestone 11 checklist green; ADR-012 records both targets and their data boundary; company infrastructure and GPU ownership are named; the measured results table in [GPU sizing and cost](03-gpu-sizing-and-cost.md#9-measured-results) is filled in, and the hardware request is based on it. **Set an Azure budget alert before you provision anything.**
 
 ## Non-negotiable deployment boundary
 
@@ -132,6 +132,8 @@ HTTP-concurrency scaling for the API and queue-depth scaling for the worker, bot
 
 **Re-measure on production hardware before trusting any limit.** The bulkhead and queue bounds in ADR-007 are tagged with the configuration they were measured on. If the production GPU, model revision, quantisation, serving-stack version, or context length differs from that tag in any way, re-run the Milestone 6 concurrency curve on the production inference host, re-derive the Milestone 7 limits, and update the tag before sending traffic. The startup check from Milestone 7 should refuse a mismatched configuration; do not work around it by editing the tag.
 
+**Re-run model confirmation on the production hardware.** The model chosen in Milestone 9 was limited to what fits the development machine. Before the company target serves anyone, repeat the ADR-000 confirmation pass on the server GPU with the full authored evaluation set, including the held-out split, and the larger size tiers that hardware allows. Keep the smaller model if it clears the bars; move up only if a larger one wins on quality by more than the noise floor at acceptable latency and throughput.
+
 ### Step 8 — Prove it operationally
 
 - Failure drills: inference-server outage/saturation, database failover, Redis down, broker unavailable, identity failure, bad deployment.
@@ -193,6 +195,7 @@ HTTP-concurrency scaling for the API and queue-depth scaling for the worker, bot
 - [ ] CI deploys via OIDC with no stored cloud credentials.
 - [ ] I saturated the self-hosted inference server deliberately, confirmed bounded-queue and fallback behaviour, and know the measured throughput ceiling.
 - [ ] Capacity limits were re-measured on the production inference host, and their configuration tag matches what is actually running.
+- [ ] I re-ran the model confirmation pass on the production hardware and recorded whether a larger model earned its place.
 - [ ] Real-data workloads deny outbound traffic by default; model weights and tokenisers load from an internal mirror with no public-hub access; a probe from inside each workload confirms public destinations are unreachable.
 - [ ] I hit the database connection limit under scale and fixed it.
 - [ ] Scale rules come from measured numbers, and maximum replicas respect downstream limits.
