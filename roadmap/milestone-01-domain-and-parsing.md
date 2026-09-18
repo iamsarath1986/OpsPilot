@@ -65,10 +65,21 @@ opspilot/
 │   └── parsing/         # log format parsers + rules
 ├── tests/unit/
 ├── experiments/
+├── samples/             # synthetic log excerpts; never a real customer log
+├── corpus/runbooks/     # the retrieval corpus (Milestone 8) — written in parallel, not by this milestone
+├── evals/faults/        # fault scripts that generate reproduced incidents and the samples above
 └── architecture/decisions/
 ```
 
 The dependency rule: `domain` imports nothing from the others. `application` imports `domain`. `adapters` imports both. Never the reverse. Enforce it by trying to write a domain test that needs no filesystem — if you can't, the layering leaked.
+
+**Two directories named "runbooks" would be a bug waiting to happen**, so they are separated from the start: `corpus/runbooks/` holds the *retrieval corpus* that Milestone 8 ingests and the model cites, while a top-level `runbooks/` — created in Milestone 4 — holds *operational* procedures for the people running OpsPilot (restore drills, alert responses). Ingestion must never pick up the latter.
+
+**Reconciling the repository as it stands.** The project currently carries a root `requirements.txt` and a `note.txt` describing an `app/main.py` FastAPI layout. Resolve both now rather than living with two conventions:
+
+- **Dependencies move into `pyproject.toml`** with optional groups — a minimal runtime group, and a `dev` group. This milestone needs roughly `pytest`, `ruff`, and `mypy` (or `pyright`) and nothing else; FastAPI, SQLAlchemy, and Alembic arrive with Milestones 3 and 4 and are pinned then. Install with `pip install -e ".[dev]"`. A lockfile follows in Milestone 2.
+- **Install the static checker before writing the domain model**, not at the end. The checklist below requires it clean, and retrofitting types to code written without it is the slow path.
+- **`note.txt` is personal scratch, not project guidance.** Its `app/main.py` layout is superseded by the tree above; keep the file if the command snippets are useful to you, but the roadmap is the authority on structure.
 
 ### Step 2 — Domain model
 
@@ -78,10 +89,20 @@ The dependency rule: `domain` imports nothing from the others. `application` imp
 | `Incident` entity | Ad-hoc dicts permit invalid states | Frozen dataclass: `id`, `tenant_id`, `title`, `description`, `status`, `severity`, `created_at` | Invariants: title non-empty, severity in enum |
 | `LogArtifact` | A log is not a string — it has origin, size, encoding, line count | Dataclass with metadata + a reference to content | Reject zero-byte and oversized artifacts |
 | `Evidence` | A finding with no source line is unverifiable | `id`, `artifact_id`, `line_number`, `text` — stable IDs | IDs unique within an analysis |
-| `Finding` | Rules must produce comparable output to what the LLM produces in M6 | `rule_id`, `category`, `severity`, `message`, `evidence_ids` | One rule → deterministic finding |
-| `Analysis` | Results need a container with provenance | `incident_id`, `findings`, `produced_by` (`"rules@v1"`), `created_at` | Same input → identical analysis |
+| `Finding` | Rules and the model must produce *the same* claim type, or they cannot be compared | One claim about the incident: `id`, `category`, `severity`, `confidence`, `statement`, `evidence_ids`, `produced_by` | One rule → deterministic finding; a finding with no evidence IDs is rejected |
+| `Analysis` | Results need a container with provenance | `incident_id`, `findings`, `recommended_steps`, `produced_by` (`"rules@v1"`), `created_at` | Same input → identical analysis |
 
-**Design this now with M6 in mind:** the LLM's structured diagnosis will be *the same shape* as a rule-based `Analysis`. That is what lets you compare "rules alone" against "rules + LLM" with real numbers later.
+**Design this now with M6 and M7 in mind — this is the decision that is expensive to get wrong.** The model's structured diagnosis in Milestone 7 is not a parallel type; it is *this* `Analysis`, with fields added. The mapping is fixed here and must hold:
+
+| Milestone 7 diagnosis field | Milestone 1 domain | Note |
+|---|---|---|
+| one entry in `likely_causes` | one `Finding` | `cause` → `statement`; `confidence` and `evidence_ids` are already on `Finding` |
+| `recommended_steps` | `Analysis.recommended_steps` | Rules may populate it too; a rule-based fix is still a recommended step |
+| `severity` | `Analysis.severity`, derived from its findings | One rule severity per finding, one rolled-up severity per analysis |
+| `summary` | added in Milestone 7 | Rules do not write prose; the field is nullable from the start |
+| `citations`, `needs_escalation`, `unsupported`, `unsupported_reason` | added in Milestones 7–8 | Additive; they do not reshape `Finding` |
+
+So a rule finding and a model cause are the *same* type distinguished by `produced_by` (`rules@v1` versus a model identity). That is what makes the Milestone 6 baseline comparison a field-by-field diff rather than a translation exercise, and what lets Milestone 7's validation layers check both producers with one set of rules. Record it in ADR-001.
 
 ### Step 3 — Error taxonomy
 
@@ -198,7 +219,8 @@ Do not advance because the CLI runs. Advance when you can tick every box honestl
 - [ ] I deleted a validation branch and a test failed.
 - [ ] I can swap `InMemoryIncidentRepository` for a different implementation without editing any domain code — and my contract tests prove it.
 - [ ] I can explain one alternative to my layering (e.g. a flat script, or an active-record ORM model as the domain) and why I rejected it.
-- [ ] **ADR-001** records the modular-monolith + layered-domain decision, the alternatives, and what evidence would make me change it.
+- [ ] A rule finding and a model-produced cause are the **same type**, distinguished only by `produced_by` — and I can point at the Milestone 7 field mapping that stays true.
+- [ ] **ADR-001** records the modular-monolith + layered-domain decision, the shared claim shape, the alternatives, and what evidence would make me change them.
 - [ ] My rule-based analysis is frozen as the **baseline** the LLM must later beat, and I know how I'd measure that.
 
 ---

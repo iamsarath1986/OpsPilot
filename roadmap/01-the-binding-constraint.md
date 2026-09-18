@@ -89,6 +89,7 @@ Verify the current state of the open-weight field at the time you choose; it mov
 
 A runbook is a written procedure for diagnosing one known problem: symptoms, evidence to collect, diagnosis branches, safe next steps, and when to escalate. The corpus is the versioned collection of them. Milestone 8 retrieves from it, and Milestone 7's evidence check verifies that citations point into it.
 
+- **It lives in `corpus/runbooks/`**, kept deliberately separate from the top-level `runbooks/` directory, which holds operational procedures for running OpsPilot itself (restore drills, alert responses). Only `corpus/` is ingested; an operations document retrieved and cited as hosting guidance would be a grounding failure with a citation attached.
 - **Written by us** from our own hosting experience, public technical knowledge, and — where it exists — the company's own public help content.
 - **Every runbook carries a review status:** `unreviewed` or `ops-reviewed`, with reviewer and date. Engineering proceeds on unreviewed runbooks. Ops review is an upgrade, not a prerequisite: asking "is this how we do it?" takes an engineer minutes, whereas asking them to author takes hours.
 - **The claim follows the status.** An answer citing an unreviewed runbook is grounded in *our* procedure, not in company policy, and the demo and reports must say so.

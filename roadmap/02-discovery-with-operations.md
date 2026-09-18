@@ -113,7 +113,7 @@ Use in a conversation, not an email. Aim to cover sections 1–5; the rest can f
 Written runbooks may or may not exist internally; it does not matter for the schedule, because we author our own. If ops later shares existing material, it improves the corpus rather than unblocking it. Start early anyway: 20–30 careful runbooks take calendar time, and Milestone 8 needs them.
 
 1. Prioritise by ticket volume × repetitiveness × risk. Begin with the categories behind the Milestone 1 deterministic rules, then the rest of the top ticket types.
-2. Use one template: scope, symptoms, evidence to collect, diagnosis branches, safe next steps, escalation conditions, author, review status, version, and source references.
+2. Use one template: scope, symptoms, evidence to collect, diagnosis branches, safe next steps, escalation conditions, author, review status, version, and source references. Write them into **`corpus/runbooks/`** — the retrieval corpus — never into the top-level `runbooks/`, which is for operating OpsPilot itself.
 3. Track each runbook through `drafted → unreviewed → ops-reviewed (optional) → versioned`. Record author, reviewer, and review date.
 4. Write diagnosis branches and safe steps yourself. A model may help with formatting only — a model-written runbook retrieved by a model is the model citing itself.
 5. Keep customer data out entirely. Examples are synthetic or come from reproduced incidents.

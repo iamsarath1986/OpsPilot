@@ -75,6 +75,8 @@ class Diagnosis(BaseModel):
     unsupported_reason: UnsupportedReason | None
 ```
 
+**This is the Milestone 1 `Analysis` with fields added, not a new type.** Each entry in `likely_causes` maps to one domain `Finding` — `cause` to `statement`, with `confidence` and `evidence_ids` already there — and `recommended_steps` maps to the field of the same name (see [the mapping table](milestone-01-domain-and-parsing.md#step-2--domain-model)). Keeping that identity is what lets the validation layers below check rule output and model output with one set of rules, and what keeps the Milestone 6 baseline comparison a field-by-field diff.
+
 Pass the schema to the self-hosted serving layer for schema-guided decoding; use grammar-constrained decoding where that server lacks native schema support. Validate the result yourself regardless. Constrained decoding guarantees shape, not business correctness, usefulness, or evidential support.
 
 The contract must make abstention representable. When `unsupported` is `true`, empty cause, step, and evidence arrays are valid; `severity` and `confidence` are null; `needs_escalation` is true; and a typed `unsupported_reason` is required (`insufficient_evidence`, `conflicting_evidence`, `out_of_scope`, or `safety_policy`). When `unsupported` is `false`, severity and confidence are required, the answer must contain non-vacuous supported content, and `unsupported_reason` is null. Enforce those cross-field rules in Pydantic and test the emitted JSON Schema against the actual serving stack.

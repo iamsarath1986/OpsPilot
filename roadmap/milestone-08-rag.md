@@ -66,7 +66,9 @@ Build a small labelled set first: 40 support questions, each with the runbook ch
 
 ### Step 1 — Accept and freeze the first corpus release
 
-Import the 20–30 runbooks we have written since the start of the project: 500 error after deploy, permission problems, disk and inode quota, mail delivery failures, SSL renewal, database connection limits, compromised WordPress, outbound spam, DNS propagation, slow site triage. Verify author, review status, version, and absence of customer data; freeze the release used by the retrieval experiments.
+Import the 20–30 runbooks we have written since the start of the project, which live in **`corpus/runbooks/`**: 500 error after deploy, permission problems, disk and inode quota, mail delivery failures, SSL renewal, database connection limits, compromised WordPress, outbound spam, DNS propagation, slow site triage. Verify author, review status, version, and absence of customer data; freeze the release used by the retrieval experiments.
+
+**Ingest from `corpus/runbooks/` and nowhere else.** The top-level `runbooks/` directory holds *operational* procedures for the people running OpsPilot — the Milestone 4 restore drill, the Milestone 11 alert runbooks — and must never enter the corpus. A path-scoped loader plus a test asserting that no chunk originates outside `corpus/` keeps an internal operations document from being retrieved and cited as customer-facing hosting guidance.
 
 The runbooks are genuinely useful to your employer independent of the software, and a reviewed corpus is worth offering to ops on its own. Writing them is not part of the 5–6-week engineering estimate. Whenever ops reviews or corrects a runbook, publish a new corpus version. Clear headings in the authoring template become chunk boundaries here.
 

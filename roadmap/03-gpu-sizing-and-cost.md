@@ -64,15 +64,21 @@ A useful upper bound: **single-request decode speed ≈ memory bandwidth ÷ weig
 | NVIDIA L4 (24 GB) | ~300 GB/s | ~50 tok/s → ~9 s | ~30 tok/s → ~14 s | does not fit |
 | NVIDIA L40S (48 GB) | ~860 GB/s | ~150 tok/s → ~3 s | ~90 tok/s → ~5 s | ~45 tok/s → ~10 s |
 
-Times assume ~400 output tokens. These are single-request ceilings: batching lowers per-request speed but raises total throughput. Every combination that fits meets the Milestone 7 SLO of 99% of requests terminating within 15 seconds at the concurrency in section 1 — which is exactly the claim the load test must confirm.
+Times assume ~400 output tokens **at concurrency 1**. They are ceilings, not operating points: at the 4–5 concurrent requests of section 1, batching raises total throughput while lowering per-request speed, so every time in this table grows.
+
+That matters for one combination in particular. **14B at 4-bit on an L4 already takes ~14 s for a single request, against a 15-second SLO** — no headroom at all, and it would breach the SLO at exactly the concurrency this document sizes for. Treat it as excluded until measurement says otherwise. The combinations with real margin are 8B on either card, and 14B or 32B on an L40S.
+
+Fitting in memory and meeting the SLO are different questions, and section 3 only answers the first. Settling the second is the whole purpose of the section 8 session.
 
 ## 5. Recommendation by stage
 
 | Stage | GPUs | Reasoning |
 |---|---|---|
-| **Pilot** — one ticket category, a few engineers | **1 × 24 GB** (L4 class) | A 7–14B model plus embedding and reranker. If the GPU fails, the Milestone 7 fallback serves deterministic-rule output or abstains; acceptable for a pilot |
+| **Pilot** — one ticket category, a few engineers | **1 × 24 GB** (L4 class) | A 7–8B model plus embedding and reranker. 14B fits the memory but not comfortably the latency budget on an L4 — see section 4. If the GPU fails, the Milestone 7 fallback serves deterministic-rule output or abstains; acceptable for a pilot |
 | **Production** — the whole first-level team | **2 × 24 GB** if the winning model is ≤14B; **2 × 48 GB** (L40S class) if 32B wins | The second GPU is for availability and maintenance, not capacity. Evaluation runs and the local judge use spare capacity overnight |
 | **Only if it later becomes customer-facing** | 80 GB data-centre GPUs | Not needed for an internal support tool |
+
+**Capacity is not speed.** Two cards with the same 24 GB can differ by two to three times in memory bandwidth, and single-request decode speed tracks bandwidth, not capacity. When comparing options at one memory size, compare bandwidth as well — that is what decides whether a 14B model meets the SLO or misses it.
 
 ### Why two GPUs rather than one
 
