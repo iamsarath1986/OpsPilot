@@ -2,6 +2,8 @@
 
 One product, built in twelve milestones. Written to be *done*, not just read.
 
+For the complete development sequence, work packages, acceptance gates, parallel workstreams, and progress tracking, use the [OpsPilot Development Plan](development-plan.md).
+
 ## Start here
 
 | File | What it covers |
